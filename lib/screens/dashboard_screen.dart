@@ -13,6 +13,8 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  String _selectedPeriod = 'Daily'; // For chart toggle
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -79,12 +81,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: AppConstants.paddingLarge),
 
               // Sales Chart
+              _buildSalesSection(),
+              const SizedBox(height: AppConstants.paddingLarge),
+
+              // AI Recommendations
               const Text(
-                'Sales This Week',
+                'Insights & AI Recommendations',
                 style: AppConstants.headingSmall,
               ),
               const SizedBox(height: AppConstants.paddingMedium),
-              _buildSalesChart(),
+              _buildAIRecommendations(),
               const SizedBox(height: AppConstants.paddingLarge),
 
               // Top Selling Items
@@ -104,6 +110,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Welcome section with date
   Widget _buildWelcomeSection() {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -152,36 +159,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
       children: [
         StatCard(
           title: 'Total Sales',
-          value: '\$2,450',
+          value: '₱12,345',
           icon: Icons.attach_money,
           color: AppConstants.successGreen,
+          percentageChange: '+5.2%',
         ),
         StatCard(
-          title: 'Orders',
-          value: '42',
+          title: 'Total Orders',
+          value: '875',
           icon: Icons.shopping_bag,
           color: AppConstants.primaryOrange,
+          percentageChange: '-1.8%',
         ),
         StatCard(
-          title: 'Avg. Order',
-          value: '\$58.33',
+          title: 'Avg. Order Value',
+          value: '₱14.11',
           icon: Icons.trending_up,
           color: Colors.blue,
+          percentageChange: '+0.5%',
         ),
         StatCard(
-          title: 'Active Tables',
-          value: '8/15',
-          icon: Icons.table_restaurant,
+          title: 'Customer Count',
+          value: '520',
+          icon: Icons.people,
           color: AppConstants.warningYellow,
+          percentageChange: '+3.1%',
         ),
       ],
     );
   }
 
-  /// Sales chart widget
-  Widget _buildSalesChart() {
+  /// Sales chart widget with period toggle
+  Widget _buildSalesSection() {
     return Container(
-      height: 250,
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       decoration: BoxDecoration(
         color: AppConstants.cardBackground,
@@ -191,78 +201,282 @@ class _DashboardScreenState extends State<DashboardScreen> {
           width: 1,
         ),
       ),
-      child: LineChart(
-        LineChartData(
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            horizontalInterval: 500,
-            getDrawingHorizontalLine: (value) {
-              return FlLine(
-                color: AppConstants.dividerColor,
-                strokeWidth: 1,
-              );
-            },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with title and toggle
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Sales Overview',
+                style: AppConstants.headingSmall,
+              ),
+              // Period toggle buttons
+              Container(
+                decoration: BoxDecoration(
+                  color: AppConstants.darkSecondary,
+                  borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+                ),
+                child: Row(
+                  children: [
+                    _buildPeriodButton('Daily'),
+                    _buildPeriodButton('Weekly'),
+                    _buildPeriodButton('Monthly'),
+                  ],
+                ),
+              ),
+            ],
           ),
-          titlesData: FlTitlesData(
-            rightTitles: AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            topTitles: AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 40,
-                getTitlesWidget: (value, meta) {
-                  return Text(
-                    '\$${value.toInt()}',
-                    style: AppConstants.bodySmall,
-                  );
-                },
-              ),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                  if (value.toInt() < days.length) {
-                    return Text(
-                      days[value.toInt()],
-                      style: AppConstants.bodySmall,
-                    );
-                  }
-                  return const Text('');
-                },
-              ),
-            ),
+          const SizedBox(height: AppConstants.paddingMedium),
+          // Chart
+          SizedBox(
+            height: 250,
+            child: _buildSalesChart(),
           ),
-          borderData: FlBorderData(show: false),
-          lineBarsData: [
-            LineChartBarData(
-              spots: [
-                const FlSpot(0, 1200),
-                const FlSpot(1, 1500),
-                const FlSpot(2, 1350),
-                const FlSpot(3, 1800),
-                const FlSpot(4, 2100),
-                const FlSpot(5, 1950),
-                const FlSpot(6, 2450),
-              ],
-              isCurved: true,
-              color: AppConstants.primaryOrange,
-              barWidth: 3,
-              dotData: FlDotData(show: true),
-              belowBarData: BarAreaData(
-                show: true,
-                color: AppConstants.primaryOrange.withOpacity(0.2),
-              ),
-            ),
-          ],
+        ],
+      ),
+    );
+  }
+
+  /// Period toggle button
+  Widget _buildPeriodButton(String period) {
+    final isSelected = _selectedPeriod == period;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedPeriod = period;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppConstants.paddingSmall,
+          vertical: 6,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppConstants.primaryOrange
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+        ),
+        child: Text(
+          period,
+          style: AppConstants.bodySmall.copyWith(
+            color: isSelected ? Colors.white : AppConstants.textSecondary,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
         ),
       ),
+    );
+  }
+
+  /// Sales chart widget
+  Widget _buildSalesChart() {
+    // Different data based on selected period
+    List<FlSpot> spots;
+    List<String> labels;
+    double interval;
+    double maxY;
+    
+    if (_selectedPeriod == 'Daily') {
+      spots = [
+        const FlSpot(0, 450),
+        const FlSpot(1, 680),
+        const FlSpot(2, 820),
+        const FlSpot(3, 920),
+        const FlSpot(4, 1150),
+        const FlSpot(5, 980),
+        const FlSpot(6, 750),
+      ];
+      labels = ['6AM', '9AM', '12PM', '3PM', '6PM', '9PM', '12AM'];
+      interval = 200;
+      maxY = 1200;
+    } else if (_selectedPeriod == 'Weekly') {
+      spots = [
+        const FlSpot(0, 1200),
+        const FlSpot(1, 1500),
+        const FlSpot(2, 1350),
+        const FlSpot(3, 1800),
+        const FlSpot(4, 2100),
+        const FlSpot(5, 1950),
+        const FlSpot(6, 2450),
+      ];
+      labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      interval = 500;
+      maxY = 2500;
+    } else {
+      spots = [
+        const FlSpot(0, 8500),
+        const FlSpot(1, 9200),
+        const FlSpot(2, 8800),
+        const FlSpot(3, 10500),
+      ];
+      labels = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+      interval = 5000;
+      maxY = 20000;
+    }
+
+    return LineChart(
+      LineChartData(
+        maxY: maxY,
+        minY: 0,
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: true,
+          horizontalInterval: interval,
+          verticalInterval: 1,
+          getDrawingHorizontalLine: (value) {
+            return FlLine(
+              color: AppConstants.dividerColor.withOpacity(0.3),
+              strokeWidth: 1,
+            );
+          },
+          getDrawingVerticalLine: (value) {
+            return FlLine(
+              color: AppConstants.dividerColor.withOpacity(0.3),
+              strokeWidth: 1,
+            );
+          },
+        ),
+        titlesData: FlTitlesData(
+          rightTitles: AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          topTitles: AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 50,
+              interval: interval,
+              getTitlesWidget: (value, meta) {
+                if (value == 0) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Text(
+                    '₱${value.toInt()}',
+                    style: AppConstants.bodySmall.copyWith(fontSize: 10),
+                    textAlign: TextAlign.right,
+                  ),
+                );
+              },
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              interval: 1,
+              getTitlesWidget: (value, meta) {
+                if (value.toInt() < labels.length) {
+                  return Text(
+                    labels[value.toInt()],
+                    style: AppConstants.bodySmall,
+                  );
+                }
+                return const Text('');
+              },
+            ),
+          ),
+        ),
+        borderData: FlBorderData(show: false),
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            isCurved: true,
+            color: AppConstants.primaryOrange,
+            barWidth: 3,
+            dotData: FlDotData(show: true),
+            belowBarData: BarAreaData(
+              show: true,
+              color: AppConstants.primaryOrange.withOpacity(0.2),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// AI Recommendations section
+  Widget _buildAIRecommendations() {
+    final recommendations = [
+      {
+        'icon': Icons.trending_up,
+        'title': 'Peak Hours Alert',
+        'description': 'Expected high sales during lunch hours today (12PM - 2PM)',
+        'color': AppConstants.successGreen,
+      },
+      {
+        'icon': Icons.inventory_2_outlined,
+        'title': 'Stock Reminder',
+        'description': 'Popular items running low: Caesar Salad, Iced Coffee',
+        'color': AppConstants.warningYellow,
+      },
+      {
+        'icon': Icons.lightbulb_outline,
+        'title': 'Recommendation',
+        'description': 'Consider adding lunch specials to boost weekday sales',
+        'color': Colors.blue,
+      },
+    ];
+
+    return Column(
+      children: recommendations.map((rec) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: AppConstants.paddingMedium),
+          padding: const EdgeInsets.all(AppConstants.paddingMedium),
+          decoration: BoxDecoration(
+            color: AppConstants.cardBackground,
+            borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+            border: Border.all(
+              color: AppConstants.dividerColor,
+              width: 1,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Icon
+              Container(
+                padding: const EdgeInsets.all(AppConstants.paddingSmall),
+                decoration: BoxDecoration(
+                  color: (rec['color'] as Color).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+                ),
+                child: Icon(
+                  rec['icon'] as IconData,
+                  color: rec['color'] as Color,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: AppConstants.paddingMedium),
+              // Text content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      rec['title'] as String,
+                      style: AppConstants.bodyLarge.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      rec['description'] as String,
+                      style: AppConstants.bodySmall.copyWith(
+                        color: AppConstants.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 

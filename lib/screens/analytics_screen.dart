@@ -4,6 +4,7 @@ import '../models/sales_data_model.dart';
 import '../services/forecast_service.dart';
 import '../utils/constants.dart';
 import '../utils/formatters.dart';
+import '../widgets/stat_card.dart';
 
 /// Sales & Performance Analysis screen with AI forecasting
 class AnalyticsScreen extends StatefulWidget {
@@ -226,24 +227,22 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         Row(
           children: [
             Expanded(
-              child: _buildMetricCard(
-                'Total Revenue',
-                '\$45,230',
-                '+12.5%',
-                true,
-                Icons.trending_up,
-                AppConstants.successGreen,
+              child: StatCard(
+                title: 'Total Revenue',
+                value: '₱45,230',
+                icon: Icons.trending_up,
+                color: AppConstants.successGreen,
+                percentageChange: '+12.5%',
               ),
             ),
             const SizedBox(width: AppConstants.paddingMedium),
             Expanded(
-              child: _buildMetricCard(
-                'Avg. Order Value',
-                '\$62.40',
-                '+5.2%',
-                true,
-                Icons.shopping_cart,
-                Colors.blue,
+              child: StatCard(
+                title: 'Avg. Order Value',
+                value: '₱62.40',
+                icon: Icons.shopping_cart,
+                color: Colors.blue,
+                percentageChange: '+5.2%',
               ),
             ),
           ],
@@ -252,72 +251,27 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         Row(
           children: [
             Expanded(
-              child: _buildMetricCard(
-                'Total Orders',
-                '725',
-                '-3.1%',
-                false,
-                Icons.receipt,
-                AppConstants.primaryOrange,
+              child: StatCard(
+                title: 'Total Orders',
+                value: '725',
+                icon: Icons.receipt,
+                color: AppConstants.primaryOrange,
+                percentageChange: '-3.1%',
               ),
             ),
             const SizedBox(width: AppConstants.paddingMedium),
             Expanded(
-              child: _buildMetricCard(
-                'Customer Return',
-                '68%',
-                '+8.3%',
-                true,
-                Icons.people,
-                AppConstants.warningYellow,
+              child: StatCard(
+                title: 'Customer Return',
+                value: '68%',
+                icon: Icons.people,
+                color: AppConstants.warningYellow,
+                percentageChange: '+8.3%',
               ),
             ),
           ],
         ),
       ],
-    );
-  }
-
-  Widget _buildMetricCard(String title, String value, String change,
-      bool isPositive, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(AppConstants.paddingMedium),
-      decoration: BoxDecoration(
-        color: AppConstants.cardBackground,
-        borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
-        border: Border.all(color: AppConstants.dividerColor, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 28),
-          const SizedBox(height: AppConstants.paddingSmall),
-          Text(value, style: AppConstants.headingMedium.copyWith(color: color)),
-          const SizedBox(height: 4),
-          Text(title, style: AppConstants.bodySmall),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Icon(
-                isPositive ? Icons.arrow_upward : Icons.arrow_downward,
-                size: 14,
-                color: isPositive
-                    ? AppConstants.successGreen
-                    : AppConstants.errorRed,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                change,
-                style: AppConstants.bodySmall.copyWith(
-                  color: isPositive
-                      ? AppConstants.successGreen
-                      : AppConstants.errorRed,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
@@ -352,7 +306,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                 reservedSize: 40,
                 getTitlesWidget: (value, meta) {
                   return Text(
-                    '\$${Formatters.formatCompactNumber(value)}',
+                    '₱${Formatters.formatCompactNumber(value)}',
                     style: AppConstants.bodySmall,
                   );
                 },

@@ -2,9 +2,9 @@ import 'package:intl/intl.dart';
 
 /// Utility functions for formatting data
 class Formatters {
-  /// Format currency (USD)
+  /// Format currency (Philippine Peso)
   static String formatCurrency(double amount) {
-    final formatter = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
+    final formatter = NumberFormat.currency(symbol: '₱', decimalDigits: 2);
     return formatter.format(amount);
   }
 

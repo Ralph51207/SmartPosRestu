@@ -8,6 +8,7 @@ class StatCard extends StatelessWidget {
   final IconData icon;
   final Color? color;
   final VoidCallback? onTap;
+  final String? percentageChange; // e.g., "+5.2%" or "-1.8%"
 
   const StatCard({
     super.key,
@@ -16,6 +17,7 @@ class StatCard extends StatelessWidget {
     required this.icon,
     this.color,
     this.onTap,
+    this.percentageChange,
   });
 
   @override
@@ -35,13 +37,22 @@ class StatCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Icon and title on the same row
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Icon(
                   icon,
-                  color: color ?? AppConstants.primaryOrange,
-                  size: AppConstants.iconLarge,
+                  color: AppConstants.textSecondary,
+                  size: 24,
+                ),
+                const SizedBox(width: AppConstants.paddingSmall),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: AppConstants.bodyMedium.copyWith(
+                      color: AppConstants.textSecondary,
+                    ),
+                  ),
                 ),
                 if (onTap != null)
                   Icon(
@@ -51,18 +62,42 @@ class StatCard extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: AppConstants.paddingSmall),
+            const SizedBox(height: AppConstants.paddingMedium),
+            // Value (large text)
             Text(
               value,
               style: AppConstants.headingLarge.copyWith(
-                color: color ?? AppConstants.primaryOrange,
+                color: AppConstants.textPrimary,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: AppConstants.bodySmall,
-            ),
+            // Percentage change (if provided)
+            if (percentageChange != null) ...[
+              const SizedBox(height: AppConstants.paddingSmall),
+              Row(
+                children: [
+                  Icon(
+                    percentageChange!.startsWith('+') 
+                        ? Icons.arrow_upward 
+                        : Icons.arrow_downward,
+                    color: percentageChange!.startsWith('+') 
+                        ? AppConstants.successGreen 
+                        : Colors.red,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    percentageChange!,
+                    style: AppConstants.bodySmall.copyWith(
+                      color: percentageChange!.startsWith('+') 
+                          ? AppConstants.successGreen 
+                          : Colors.red,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
