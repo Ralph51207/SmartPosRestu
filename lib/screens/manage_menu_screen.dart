@@ -51,7 +51,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
           price: 9.00,
           category: MenuCategory.mainCourse,
           isAvailable: true,
-          salesCount: 132,
+          salesCount: 134,
         ),
         MenuItem(
           id: 'MENU003',

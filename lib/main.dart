@@ -5,7 +5,8 @@ import 'screens/table_management_screen.dart';
 import 'screens/staff_management_screen.dart';
 import 'screens/analytics_screen.dart';
 import 'screens/manage_menu_screen.dart';
-import 'screens/payments_history_screen.dart';
+import 'screens/transaction_history_screen.dart';
+import 'screens/sales_history_screen.dart';
 import 'screens/settings_screen.dart';
 import 'utils/constants.dart';
 
@@ -277,15 +278,28 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   _buildDrawerItem(
                     context,
                     icon: Icons.payment_outlined,
-                    title: 'Payment History',
+                    title: 'Transaction History',
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const PaymentsHistoryScreen()),
+                        MaterialPageRoute(builder: (_) => const TransactionHistoryScreen()),
                       );
                     },
                   ),
+                  _buildDrawerItem(
+                    context,
+                    icon: Icons.bar_chart,
+                    title: 'Sales History',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const SalesHistoryScreen()),
+                      );
+                    },
+                  ),
+                  const Divider(color: AppConstants.dividerColor, height: 32),
                   _buildDrawerItem(
                     context,
                     icon: Icons.settings_outlined,
