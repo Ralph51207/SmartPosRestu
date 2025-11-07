@@ -23,7 +23,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   bool _isLoading = true;
   
   // Date range filters
-  String _selectedHistoricalRange = 'This Week';
   String _selectedForecastRange = '7 Days';
   
   // Date range picker
@@ -201,21 +200,34 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           const SizedBox(height: AppConstants.paddingLarge),
 
           // Sales Trend Chart
-          const Text(
-            'Sales Trend',
-            style: AppConstants.headingSmall,
-          ),
-          const SizedBox(height: AppConstants.paddingMedium),
-          _buildRevenueChart(),
+          _buildSalesTrendSection(),
           const SizedBox(height: AppConstants.paddingLarge),
 
-          // Performance comparison
+          // Top 10 Best Sellers
           const Text(
-            'Performance Comparison',
+            'Top 10 Best Sellers',
             style: AppConstants.headingSmall,
           ),
           const SizedBox(height: AppConstants.paddingMedium),
-          _buildPerformanceComparison(),
+          _buildTopSellingItems(),
+          const SizedBox(height: AppConstants.paddingLarge),
+
+          // Payment Method Distribution
+          const Text(
+            'Payment Method Distribution',
+            style: AppConstants.headingSmall,
+          ),
+          const SizedBox(height: AppConstants.paddingMedium),
+          _buildPaymentMethodDistribution(),
+          const SizedBox(height: AppConstants.paddingLarge),
+
+          // Peak Hours Heatmap
+          const Text(
+            'Peak Hours Analysis',
+            style: AppConstants.headingSmall,
+          ),
+          const SizedBox(height: AppConstants.paddingMedium),
+          _buildPeakHoursHeatmap(),
         ],
       ),
     );
@@ -285,6 +297,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               ),
             ],
           ),
+          const SizedBox(height: AppConstants.paddingLarge),
+
+          // Forecast Accuracy Metrics
+          _buildForecastAccuracyCard(),
           const SizedBox(height: AppConstants.paddingLarge),
 
           // Forecast Summary Cards
@@ -391,141 +407,132 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     );
   }
 
-  /// Revenue chart
-  Widget _buildRevenueChart() {
+  /// Sales Trend Section
+  Widget _buildSalesTrendSection() {
     return Container(
-      height: 250,
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       decoration: BoxDecoration(
         color: AppConstants.cardBackground,
         borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
-        border: Border.all(color: AppConstants.dividerColor, width: 1),
-      ),
-      child: LineChart(
-        LineChartData(
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            getDrawingHorizontalLine: (value) {
-              return FlLine(
-                color: AppConstants.dividerColor,
-                strokeWidth: 1,
-              );
-            },
-          ),
-          titlesData: FlTitlesData(
-            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 40,
-                getTitlesWidget: (value, meta) {
-                  return Text(
-                    '₱${Formatters.formatCompactNumber(value)}',
-                    style: AppConstants.bodySmall,
-                  );
-                },
-              ),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                interval: 5,
-                getTitlesWidget: (value, meta) {
-                  return Text(
-                    'Day ${value.toInt()}',
-                    style: AppConstants.bodySmall,
-                  );
-                },
-              ),
-            ),
-          ),
-          borderData: FlBorderData(show: false),
-          lineBarsData: [
-            LineChartBarData(
-              spots: List.generate(30, (i) {
-                return FlSpot(
-                    i.toDouble(), 1000 + (i * 50) + (i % 3 * 200).toDouble());
-              }),
-              isCurved: true,
-              color: AppConstants.primaryOrange,
-              barWidth: 3,
-              dotData: FlDotData(show: false),
-              belowBarData: BarAreaData(
-                show: true,
-                color: AppConstants.primaryOrange.withOpacity(0.2),
-              ),
-            ),
-          ],
+        border: Border.all(
+          color: AppConstants.dividerColor,
+          width: 1,
         ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          const Text(
+            'Sales Trend',
+            style: AppConstants.headingSmall,
+          ),
+          const SizedBox(height: AppConstants.paddingMedium),
+          // Chart
+          SizedBox(
+            height: 250,
+            child: _buildSalesTrendChart(),
+          ),
+        ],
       ),
     );
   }
 
-  /// Performance comparison chart
-  Widget _buildPerformanceComparison() {
-    return Container(
-      height: 200,
-      padding: const EdgeInsets.all(AppConstants.paddingMedium),
-      decoration: BoxDecoration(
-        color: AppConstants.cardBackground,
-        borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
-        border: Border.all(color: AppConstants.dividerColor, width: 1),
-      ),
-      child: BarChart(
-        BarChartData(
-          alignment: BarChartAlignment.spaceAround,
-          maxY: 100,
-          barTouchData: BarTouchData(enabled: false),
-          titlesData: FlTitlesData(
-            show: true,
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  const categories = [
-                    'This Week',
-                    'Last Week',
-                    'This Month',
-                    'Last Month'
-                  ];
-                  if (value.toInt() < categories.length) {
-                    return Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        categories[value.toInt()],
-                        style: AppConstants.bodySmall,
-                      ),
-                    );
-                  }
-                  return const Text('');
-                },
-              ),
-            ),
-            leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          ),
-          borderData: FlBorderData(show: false),
-          barGroups: [
-            BarChartGroupData(x: 0, barRods: [
-              BarChartRodData(
-                  toY: 85, color: AppConstants.primaryOrange, width: 20)
-            ]),
-            BarChartGroupData(x: 1, barRods: [
-              BarChartRodData(toY: 72, color: Colors.blue, width: 20)
-            ]),
-            BarChartGroupData(x: 2, barRods: [
-              BarChartRodData(
-                  toY: 90, color: AppConstants.successGreen, width: 20)
-            ]),
-            BarChartGroupData(x: 3, barRods: [
-              BarChartRodData(
-                  toY: 78, color: AppConstants.textSecondary, width: 20)
-            ]),
-          ],
+  /// Sales Trend Chart
+  Widget _buildSalesTrendChart() {
+    // Sample data for chart - will be replaced with actual date range data
+    final spots = [
+      const FlSpot(0, 8500),
+      const FlSpot(1, 10200),
+      const FlSpot(2, 9800),
+      const FlSpot(3, 12500),
+      const FlSpot(4, 15200),
+      const FlSpot(5, 14800),
+      const FlSpot(6, 16500),
+    ];
+    final labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const interval = 2000.0;
+    const maxY = 18000.0;
+
+    return LineChart(
+      LineChartData(
+        maxY: maxY,
+        minY: 0,
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: true,
+          horizontalInterval: interval,
+          verticalInterval: 1,
+          getDrawingHorizontalLine: (value) {
+            return FlLine(
+              color: AppConstants.dividerColor.withOpacity(0.3),
+              strokeWidth: 1,
+            );
+          },
+          getDrawingVerticalLine: (value) {
+            return FlLine(
+              color: AppConstants.dividerColor.withOpacity(0.3),
+              strokeWidth: 1,
+            );
+          },
         ),
+        titlesData: FlTitlesData(
+          rightTitles: AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          topTitles: AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 50,
+              interval: interval,
+              getTitlesWidget: (value, meta) {
+                if (value == 0) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Text(
+                    '₱${value.toInt()}',
+                    style: AppConstants.bodySmall.copyWith(fontSize: 10),
+                    textAlign: TextAlign.right,
+                  ),
+                );
+              },
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              interval: 1,
+              getTitlesWidget: (value, meta) {
+                if (value.toInt() < labels.length) {
+                  return Text(
+                    labels[value.toInt()],
+                    style: AppConstants.bodySmall,
+                  );
+                }
+                return const Text('');
+              },
+            ),
+          ),
+        ),
+        borderData: FlBorderData(show: false),
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            isCurved: true,
+            color: AppConstants.primaryOrange,
+            barWidth: 3,
+            dotData: FlDotData(show: true),
+            belowBarData: BarAreaData(
+              show: true,
+              color: AppConstants.primaryOrange.withOpacity(0.2),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -771,6 +778,45 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       ),
       child: LineChart(
         LineChartData(
+          // Interactive tooltips for forecast chart
+          lineTouchData: LineTouchData(
+            enabled: true,
+            touchTooltipData: LineTouchTooltipData(
+              getTooltipColor: (_) => AppConstants.darkSecondary.withOpacity(0.95),
+              tooltipRoundedRadius: AppConstants.radiusSmall,
+              tooltipPadding: const EdgeInsets.all(8),
+              tooltipBorder: BorderSide(color: AppConstants.primaryOrange, width: 1),
+              getTooltipItems: (List<LineBarSpot> touchedSpots) {
+                return touchedSpots.map((spot) {
+                  final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                  final isActual = spot.barIndex == 0;
+                  return LineTooltipItem(
+                    '${days[spot.x.toInt()]}\n',
+                    AppConstants.bodySmall.copyWith(
+                      color: AppConstants.textSecondary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    children: [
+                      TextSpan(
+                        text: '${isActual ? "Actual" : "Projected"}: ',
+                        style: AppConstants.bodySmall.copyWith(
+                          color: isActual ? AppConstants.successGreen : AppConstants.primaryOrange,
+                        ),
+                      ),
+                      TextSpan(
+                        text: '₱${(spot.y / 1000).toStringAsFixed(1)}K',
+                        style: AppConstants.bodySmall.copyWith(
+                          color: AppConstants.textPrimary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList();
+              },
+            ),
+            handleBuiltInTouches: true,
+          ),
           gridData: FlGridData(
             show: true,
             drawVerticalLine: true,
@@ -951,61 +997,707 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     );
   }
 
+  /// Forecast Accuracy Card
+  Widget _buildForecastAccuracyCard() {
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      decoration: BoxDecoration(
+        color: AppConstants.cardBackground,
+        borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+        border: Border.all(color: AppConstants.dividerColor, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.verified, color: AppConstants.successGreen, size: 20),
+              const SizedBox(width: AppConstants.paddingSmall),
+              const Text(
+                'Forecast Accuracy Metrics',
+                style: AppConstants.headingSmall,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppConstants.paddingMedium),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Overall Accuracy',
+                      style: AppConstants.bodySmall.copyWith(
+                        color: AppConstants.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Text(
+                          '87.3%',
+                          style: AppConstants.headingMedium.copyWith(
+                            color: AppConstants.successGreen,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppConstants.successGreen.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '+2.1%',
+                            style: AppConstants.bodySmall.copyWith(
+                              color: AppConstants.successGreen,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    LinearProgressIndicator(
+                      value: 0.873,
+                      backgroundColor: AppConstants.dividerColor,
+                      valueColor: AlwaysStoppedAnimation<Color>(AppConstants.successGreen),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppConstants.paddingMedium),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Last 7 Days',
+                      style: AppConstants.bodySmall.copyWith(
+                        color: AppConstants.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '92.1%',
+                      style: AppConstants.headingMedium.copyWith(
+                        color: AppConstants.successGreen,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    LinearProgressIndicator(
+                      value: 0.921,
+                      backgroundColor: AppConstants.dividerColor,
+                      valueColor: AlwaysStoppedAnimation<Color>(AppConstants.successGreen),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppConstants.paddingMedium),
+          Divider(color: AppConstants.dividerColor),
+          const SizedBox(height: AppConstants.paddingSmall),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildAccuracyMetric('Sales', '89%', AppConstants.primaryOrange),
+              _buildAccuracyMetric('Traffic', '91%', Colors.blue),
+              _buildAccuracyMetric('Peak Hours', '85%', AppConstants.warningYellow),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccuracyMetric(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: AppConstants.bodyLarge.copyWith(
+            color: color,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: AppConstants.bodySmall.copyWith(
+            color: AppConstants.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Top Selling Items
+  Widget _buildTopSellingItems() {
+    final topItems = [
+      {'name': 'Pasta Carbonara', 'sold': 245, 'revenue': 12250.0},
+      {'name': 'Grilled Chicken', 'sold': 198, 'revenue': 11880.0},
+      {'name': 'Caesar Salad', 'sold': 176, 'revenue': 7040.0},
+      {'name': 'Margherita Pizza', 'sold': 165, 'revenue': 9900.0},
+      {'name': 'Fish & Chips', 'sold': 142, 'revenue': 8520.0},
+      {'name': 'Beef Steak', 'sold': 128, 'revenue': 10240.0},
+      {'name': 'Vegetable Soup', 'sold': 115, 'revenue': 3450.0},
+      {'name': 'Fried Rice', 'sold': 108, 'revenue': 3240.0},
+      {'name': 'Chocolate Cake', 'sold': 95, 'revenue': 3800.0},
+      {'name': 'Iced Coffee', 'sold': 87, 'revenue': 2610.0},
+    ];
+
+    final maxSold = topItems[0]['sold'] as int;
+
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      decoration: BoxDecoration(
+        color: AppConstants.cardBackground,
+        borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+        border: Border.all(color: AppConstants.dividerColor, width: 1),
+      ),
+      child: Column(
+        children: [
+          // Header Row
+          Row(
+            children: [
+              const Expanded(
+                flex: 3,
+                child: Text(
+                  'Item',
+                  style: AppConstants.bodySmall,
+                ),
+              ),
+              const Expanded(
+                flex: 2,
+                child: Text(
+                  'Qty Sold',
+                  style: AppConstants.bodySmall,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const Expanded(
+                flex: 2,
+                child: Text(
+                  'Revenue',
+                  style: AppConstants.bodySmall,
+                  textAlign: TextAlign.right,
+                ),
+              ),
+            ],
+          ),
+          const Divider(color: AppConstants.dividerColor),
+          // Items List
+          ...topItems.asMap().entries.map((entry) {
+            final index = entry.key;
+            final item = entry.value;
+            final name = item['name'] as String;
+            final sold = item['sold'] as int;
+            final revenue = item['revenue'] as double;
+            final percentage = (sold / maxSold);
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      // Rank
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: index < 3
+                              ? AppConstants.primaryOrange.withOpacity(0.2)
+                              : AppConstants.darkSecondary,
+                          borderRadius: BorderRadius.circular(12),
+                          border: index < 3
+                              ? Border.all(color: AppConstants.primaryOrange, width: 1)
+                              : null,
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${index + 1}',
+                            style: AppConstants.bodySmall.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: index < 3
+                                  ? AppConstants.primaryOrange
+                                  : AppConstants.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Item Name
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          name,
+                          style: AppConstants.bodyMedium.copyWith(
+                            fontWeight: index < 3 ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                      // Quantity
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          '$sold',
+                          style: AppConstants.bodyMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      // Revenue
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          Formatters.formatCurrency(revenue),
+                          style: AppConstants.bodyMedium.copyWith(
+                            color: AppConstants.successGreen,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.right,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  // Progress Bar
+                  LinearProgressIndicator(
+                    value: percentage,
+                    backgroundColor: AppConstants.dividerColor,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      index < 3 ? AppConstants.primaryOrange : AppConstants.successGreen,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
+  /// Payment Method Distribution
+  Widget _buildPaymentMethodDistribution() {
+    final paymentData = [
+      {'method': 'Cash', 'amount': 20353.5, 'count': 425, 'color': AppConstants.successGreen},
+      {'method': 'Card', 'amount': 15830.75, 'count': 215, 'color': Colors.blue},
+      {'method': 'GCash', 'amount': 6784.25, 'count': 65, 'color': AppConstants.primaryOrange},
+      {'method': 'Maya', 'amount': 2261.5, 'count': 20, 'color': AppConstants.warningYellow},
+    ];
+
+    final total = paymentData.fold(0.0, (sum, item) => sum + (item['amount'] as double));
+
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      decoration: BoxDecoration(
+        color: AppConstants.cardBackground,
+        borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+        border: Border.all(color: AppConstants.dividerColor, width: 1),
+      ),
+      child: Column(
+        children: [
+          // Pie chart representation using stacked bars
+          Row(
+            children: paymentData.map((data) {
+              final amount = data['amount'] as double;
+              final percentage = (amount / total);
+              final isFirst = data == paymentData.first;
+              final isLast = data == paymentData.last;
+              
+              return Expanded(
+                flex: (percentage * 100).toInt(),
+                child: Container(
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: data['color'] as Color,
+                    borderRadius: isFirst
+                        ? const BorderRadius.horizontal(left: Radius.circular(8))
+                        : isLast
+                            ? const BorderRadius.horizontal(right: Radius.circular(8))
+                            : null,
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${(percentage * 100).toStringAsFixed(0)}%',
+                      style: AppConstants.bodySmall.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: AppConstants.paddingLarge),
+          // Payment details
+          ...paymentData.map((data) {
+            final amount = data['amount'] as double;
+            final percentage = (amount / total * 100);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppConstants.paddingMedium),
+              child: Row(
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: data['color'] as Color,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      data['method'] as String,
+                      style: AppConstants.bodyMedium,
+                    ),
+                  ),
+                  Text(
+                    '${data['count']} orders',
+                    style: AppConstants.bodySmall.copyWith(
+                      color: AppConstants.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(width: AppConstants.paddingMedium),
+                  Text(
+                    Formatters.formatCurrency(amount),
+                    style: AppConstants.bodyMedium.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: (data['color'] as Color).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      '${percentage.toStringAsFixed(1)}%',
+                      style: AppConstants.bodySmall.copyWith(
+                        color: data['color'] as Color,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
+  /// Peak Hours Heatmap
+  Widget _buildPeakHoursHeatmap() {
+    // Sample data: revenue by hour (0-23) for each day (0-6)
+    final heatmapData = [
+      [0.5, 1.2, 0.8, 1.5, 2.1, 3.2, 2.8], // 6 AM
+      [1.2, 2.1, 1.8, 2.5, 3.2, 4.5, 3.8], // 7 AM
+      [2.5, 3.8, 3.2, 4.1, 5.2, 6.8, 5.5], // 8 AM
+      [3.8, 5.2, 4.5, 5.8, 6.9, 8.2, 7.1], // 9 AM
+      [4.5, 6.1, 5.8, 6.5, 7.8, 9.5, 8.2], // 10 AM
+      [5.2, 7.8, 6.9, 8.2, 9.5, 11.2, 10.1], // 11 AM
+      [8.5, 12.5, 11.2, 13.5, 15.8, 18.2, 16.5], // 12 PM - Peak lunch
+      [9.2, 13.8, 12.5, 14.2, 16.5, 19.5, 17.8], // 1 PM - Peak lunch
+      [6.5, 9.2, 8.5, 10.1, 11.5, 13.8, 12.2], // 2 PM
+      [4.2, 6.5, 5.8, 7.2, 8.5, 10.1, 9.2], // 3 PM
+      [3.5, 5.2, 4.8, 6.1, 7.2, 8.8, 7.5], // 4 PM
+      [4.8, 7.2, 6.5, 8.5, 10.2, 12.5, 11.2], // 5 PM
+      [7.5, 11.2, 10.5, 13.2, 15.5, 18.8, 17.2], // 6 PM - Peak dinner
+      [8.8, 13.5, 12.8, 15.8, 18.2, 21.5, 19.8], // 7 PM - Peak dinner
+      [7.2, 10.8, 10.2, 12.5, 14.8, 17.5, 16.2], // 8 PM
+      [5.5, 8.2, 7.8, 9.5, 11.2, 13.8, 12.5], // 9 PM
+    ];
+
+    final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final maxValue = 21.5;
+
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      decoration: BoxDecoration(
+        color: AppConstants.cardBackground,
+        borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+        border: Border.all(color: AppConstants.dividerColor, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Legend
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Text(
+                'Low',
+                style: AppConstants.bodySmall.copyWith(
+                  color: AppConstants.textSecondary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              ...List.generate(5, (i) {
+                return Container(
+                  width: 16,
+                  height: 16,
+                  margin: const EdgeInsets.only(right: 4),
+                  decoration: BoxDecoration(
+                    color: _getHeatmapColor(i / 4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                );
+              }),
+              const SizedBox(width: 8),
+              Text(
+                'High',
+                style: AppConstants.bodySmall.copyWith(
+                  color: AppConstants.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppConstants.paddingMedium),
+          // Day headers
+          Row(
+            children: [
+              const SizedBox(width: 50), // Space for hour labels
+              ...days.map((day) => Expanded(
+                child: Center(
+                  child: Text(
+                    day,
+                    style: AppConstants.bodySmall.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              )).toList(),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Heatmap grid
+          ...List.generate(heatmapData.length, (hourIndex) {
+            final hour = hourIndex + 6; // Starting from 6 AM
+            final hourLabel = hour <= 12 ? '${hour}AM' : '${hour - 12}PM';
+            
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 50,
+                    child: Text(
+                      hourLabel,
+                      style: AppConstants.bodySmall.copyWith(
+                        color: AppConstants.textSecondary,
+                      ),
+                    ),
+                  ),
+                  ...List.generate(7, (dayIndex) {
+                    final value = heatmapData[hourIndex][dayIndex];
+                    final intensity = value / maxValue;
+                    
+                    return Expanded(
+                      child: Tooltip(
+                        message: '${days[dayIndex]} $hourLabel\n₱${value.toStringAsFixed(1)}K',
+                        child: Container(
+                          height: 24,
+                          margin: const EdgeInsets.only(right: 4),
+                          decoration: BoxDecoration(
+                            color: _getHeatmapColor(intensity),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            );
+          }).toList(),
+          const SizedBox(height: AppConstants.paddingMedium),
+          // Summary
+          Container(
+            padding: const EdgeInsets.all(AppConstants.paddingSmall),
+            decoration: BoxDecoration(
+              color: AppConstants.primaryOrange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+              border: Border.all(color: AppConstants.primaryOrange.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.lightbulb_outline,
+                  color: AppConstants.primaryOrange,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Peak hours: 12-2PM (Lunch) & 6-8PM (Dinner). Saturday & Sunday show highest traffic.',
+                    style: AppConstants.bodySmall.copyWith(
+                      color: AppConstants.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getHeatmapColor(double intensity) {
+    if (intensity < 0.2) return AppConstants.successGreen.withOpacity(0.2);
+    if (intensity < 0.4) return AppConstants.successGreen.withOpacity(0.4);
+    if (intensity < 0.6) return AppConstants.warningYellow.withOpacity(0.6);
+    if (intensity < 0.8) return AppConstants.primaryOrange.withOpacity(0.7);
+    return AppConstants.errorRed.withOpacity(0.8);
+  }
+
   /// Inline AI Insights
   Widget _buildInlineInsights() {
     final insights = [
       {
-        'text': 'Sales are up 12% compared to last week.',
-        'icon': Icons.trending_up,
-        'color': AppConstants.successGreen,
-      },
-      {
-        'text': 'Expected 25% increase during lunch hours today.',
-        'icon': Icons.lightbulb_outline,
+        'text': 'Schedule +2 servers for Saturday lunch (12-2PM). Expected 35% traffic increase.',
+        'action': 'View Schedule',
+        'icon': Icons.people,
         'color': AppConstants.primaryOrange,
+        'priority': 'High',
       },
       {
-        'text': 'Weekend sales projected to reach all-time high.',
-        'icon': Icons.celebration,
+        'text': 'Order 30kg pasta by Thursday. Forecast shows 145 orders this weekend.',
+        'action': 'Update Inventory',
+        'icon': Icons.inventory_2,
         'color': AppConstants.warningYellow,
+        'priority': 'High',
       },
       {
-        'text': 'Consider promoting desserts - low stock but high demand expected.',
-        'icon': Icons.recommend,
+        'text': 'Rain expected Friday. Promote comfort food combos - historically 22% sales boost.',
+        'action': 'Create Promo',
+        'icon': Icons.campaign,
         'color': Colors.blue,
+        'priority': 'Medium',
+      },
+      {
+        'text': 'Dessert demand up 18% but stock low. Add Leche Flan to specials board.',
+        'action': 'Add to Menu',
+        'icon': Icons.cake,
+        'color': AppConstants.successGreen,
+        'priority': 'Medium',
+      },
+      {
+        'text': 'Monday typically slow. Run 20% lunch special to boost 11AM-1PM traffic.',
+        'action': 'Set Discount',
+        'icon': Icons.local_offer,
+        'color': Colors.purple,
+        'priority': 'Low',
       },
     ];
 
     return Column(
       children: insights.map((insight) {
+        final priority = insight['priority'] as String;
+        Color priorityColor = AppConstants.textSecondary;
+        if (priority == 'High') priorityColor = AppConstants.errorRed;
+        if (priority == 'Medium') priorityColor = AppConstants.warningYellow;
+        
         return Container(
           margin: const EdgeInsets.only(bottom: AppConstants.paddingMedium),
           padding: const EdgeInsets.all(AppConstants.paddingMedium),
           decoration: BoxDecoration(
             color: AppConstants.cardBackground,
             borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
-            border: Border.all(color: AppConstants.dividerColor, width: 1),
+            border: Border.all(
+              color: priority == 'High' 
+                  ? AppConstants.primaryOrange.withOpacity(0.5)
+                  : AppConstants.dividerColor,
+              width: priority == 'High' ? 2 : 1,
+            ),
           ),
-          child: Row(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: (insight['color'] as Color).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
-                ),
-                child: Icon(
-                  insight['icon'] as IconData,
-                  color: insight['color'] as Color,
-                  size: 20,
-                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: (insight['color'] as Color).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+                    ),
+                    child: Icon(
+                      insight['icon'] as IconData,
+                      color: insight['color'] as Color,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: AppConstants.paddingMedium),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: priorityColor.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                priority,
+                                style: AppConstants.bodySmall.copyWith(
+                                  color: priorityColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          insight['text'] as String,
+                          style: AppConstants.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: AppConstants.paddingMedium),
-              Expanded(
-                child: Text(
-                  insight['text'] as String,
-                  style: AppConstants.bodyMedium,
+              const SizedBox(height: AppConstants.paddingSmall),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${insight['action']} feature coming soon!'),
+                        backgroundColor: AppConstants.primaryOrange,
+                      ),
+                    );
+                  },
+                  icon: Icon(
+                    Icons.arrow_forward,
+                    size: 16,
+                    color: AppConstants.primaryOrange,
+                  ),
+                  label: Text(
+                    insight['action'] as String,
+                    style: AppConstants.bodySmall.copyWith(
+                      color: AppConstants.primaryOrange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
             ],
