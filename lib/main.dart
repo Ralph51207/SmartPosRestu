@@ -5,6 +5,8 @@ import 'screens/table_management_screen.dart';
 import 'screens/staff_management_screen.dart';
 import 'screens/analytics_screen.dart';
 import 'screens/manage_menu_screen.dart';
+import 'screens/payments_history_screen.dart';
+import 'screens/settings_screen.dart';
 import 'utils/constants.dart';
 
 /// Main entry point of the SmartServe POS application
@@ -278,7 +280,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     title: 'Payment History',
                     onTap: () {
                       Navigator.pop(context);
-                      _showComingSoonDialog(context, 'Payment History');
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const PaymentsHistoryScreen()),
+                      );
                     },
                   ),
                   _buildDrawerItem(
@@ -287,7 +292,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     title: 'Settings',
                     onTap: () {
                       Navigator.pop(context);
-                      _showComingSoonDialog(context, 'Settings');
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                      );
                     },
                   ),
                 ],
@@ -471,4 +479,3 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 }
-
