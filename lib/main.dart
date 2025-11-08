@@ -7,6 +7,7 @@ import 'screens/analytics_screen.dart';
 import 'screens/manage_menu_screen.dart';
 import 'screens/transaction_history_screen.dart';
 import 'screens/sales_history_screen.dart';
+import 'screens/user_profile_screen.dart';
 import 'screens/settings_screen.dart';
 import 'utils/constants.dart';
 
@@ -258,7 +259,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     title: 'User Profile',
                     onTap: () {
                       Navigator.pop(context);
-                      _showComingSoonDialog(context, 'User Profile');
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const UserProfileScreen(),
+                        ),
+                      );
                     },
                   ),
                   _buildDrawerItem(
