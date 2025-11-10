@@ -29,16 +29,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   DateTime? _startDate;
   DateTime? _endDate;
   
-  // Comparison overlay
-  bool _showComparisonOverlay = false;
-  
   // Calendar navigation
   DateTime _selectedCalendarMonth = DateTime.now();
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadAnalyticsData();
   }
 
@@ -79,15 +76,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.compare_arrows),
-            onPressed: () {
-              setState(() {
-                _showComparisonOverlay = true;
-              });
-            },
-            tooltip: 'Compare Historical vs Forecast',
-          ),
-          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadAnalyticsData,
           ),
@@ -102,30 +90,26 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           labelColor: AppConstants.primaryOrange,
           unselectedLabelColor: AppConstants.textSecondary,
           tabs: const [
-            Tab(text: 'Historical Analysis'),
+            Tab(text: 'Historical'),
             Tab(text: 'AI Forecast'),
+            Tab(text: 'Comparison'),
           ],
         ),
       ),
-      body: Stack(
-        children: [
-          _isLoading
-              ? Center(
-                  child: CircularProgressIndicator(
-                    color: AppConstants.primaryOrange,
-                  ),
-                )
-              : TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildOverviewTab(),
-                    _buildForecastTab(),
-                  ],
-                ),
-          // Comparison overlay
-          if (_showComparisonOverlay) _buildComparisonOverlay(),
-        ],
-      ),
+      body: _isLoading
+          ? Center(
+              child: CircularProgressIndicator(
+                color: AppConstants.primaryOrange,
+              ),
+            )
+          : TabBarView(
+              controller: _tabController,
+              children: [
+                _buildOverviewTab(),
+                _buildForecastTab(),
+                _buildComparisonTab(),
+              ],
+            ),
     );
   }
 
@@ -204,6 +188,24 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
           // Sales Trend Chart
           _buildSalesTrendSection(),
+          const SizedBox(height: AppConstants.paddingLarge),
+
+          // Category Sales Distribution
+          const Text(
+            'Category Sales Distribution',
+            style: AppConstants.headingSmall,
+          ),
+          const SizedBox(height: AppConstants.paddingMedium),
+          _buildCategorySalesDistribution(),
+          const SizedBox(height: AppConstants.paddingLarge),
+
+          // Order Channel Distribution
+          const Text(
+            'Order Channel Distribution',
+            style: AppConstants.headingSmall,
+          ),
+          const SizedBox(height: AppConstants.paddingMedium),
+          _buildOrderChannelDistribution(),
           const SizedBox(height: AppConstants.paddingLarge),
 
           // Top 10 Best Sellers
@@ -409,11 +411,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             const SizedBox(width: AppConstants.paddingMedium),
             Expanded(
               child: StatCard(
-                title: 'Avg. Order Value',
-                value: '₱62.40',
-                icon: Icons.shopping_cart,
-                color: Colors.blue,
-                percentageChange: '+5.2%',
+                title: 'Total Orders',
+                value: '725',
+                icon: Icons.receipt,
+                color: AppConstants.primaryOrange,
+                percentageChange: '-3.1%',
               ),
             ),
           ],
@@ -423,21 +425,21 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           children: [
             Expanded(
               child: StatCard(
-                title: 'Total Orders',
-                value: '725',
-                icon: Icons.receipt,
-                color: AppConstants.primaryOrange,
-                percentageChange: '-3.1%',
+                title: 'Avg. Order Value',
+                value: '₱62.40',
+                icon: Icons.shopping_cart,
+                color: Colors.blue,
+                percentageChange: '+5.2%',
               ),
             ),
             const SizedBox(width: AppConstants.paddingMedium),
             Expanded(
               child: StatCard(
-                title: 'Customer Return',
-                value: '68%',
-                icon: Icons.people,
+                title: 'Peak Hour Revenue',
+                value: '₱18,500',
+                icon: Icons.access_time,
                 color: AppConstants.warningYellow,
-                percentageChange: '+8.3%',
+                percentageChange: '12-2PM',
               ),
             ),
           ],
@@ -655,9 +657,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             children: [
               Expanded(
                 child: _buildSummaryCard(
-                  'Predicted Total Sales',
+                  'Predicted Revenue',
                   '₱58,450',
-                  '+15.2%',
+                  '+29.2% vs Historical',
                   Icons.trending_up,
                   AppConstants.successGreen,
                 ),
@@ -665,10 +667,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               const SizedBox(width: AppConstants.paddingMedium),
               Expanded(
                 child: _buildSummaryCard(
-                  'Predicted Top Item',
-                  'Pasta Carbonara',
-                  '145 orders',
-                  Icons.restaurant,
+                  'Predicted Orders',
+                  '890',
+                  '+22.8% vs Historical',
+                  Icons.receipt,
                   AppConstants.primaryOrange,
                 ),
               ),
@@ -681,10 +683,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             children: [
               Expanded(
                 child: _buildSummaryCard(
-                  'Predicted Peak Hours',
-                  '12PM - 2PM',
-                  'Lunch Rush',
-                  Icons.access_time,
+                  'Predicted Avg. Order',
+                  '₱65.67',
+                  '+5.2% vs Historical',
+                  Icons.shopping_cart,
                   Colors.blue,
                 ),
               ),
@@ -693,7 +695,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                 child: _buildSummaryCard(
                   'Recommended Action',
                   'Stock Up Pasta',
-                  'Low inventory',
+                  'Top predicted item',
                   Icons.inventory,
                   AppConstants.warningYellow,
                 ),
@@ -1352,7 +1354,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         'percentage': 65,
         'orders': 540,
         'revenue': '₱33,800',
-        'trend': '+8%',
+        'historical': '470 orders',
+        'trend': '+15%',
         'color': AppConstants.primaryOrange,
         'icon': Icons.restaurant_menu,
         'peak': 'Sat-Sun Lunch & Dinner',
@@ -1362,7 +1365,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         'percentage': 25,
         'orders': 208,
         'revenue': '₱13,000',
-        'trend': '+12%',
+        'historical': '181 orders',
+        'trend': '+15%',
         'color': Colors.blue,
         'icon': Icons.shopping_bag,
         'peak': 'Weekday Lunch',
@@ -1372,7 +1376,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         'percentage': 10,
         'orders': 83,
         'revenue': '₱5,200',
-        'trend': '+15%',
+        'historical': '74 orders',
+        'trend': '+12%',
         'color': AppConstants.successGreen,
         'icon': Icons.delivery_dining,
         'peak': 'Rainy Days, Late Night',
@@ -1481,8 +1486,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${channel['orders']} orders • ${channel['revenue']}',
+                          'Predicted: ${channel['orders']} orders • ${channel['revenue']}',
                           style: AppConstants.bodyMedium.copyWith(
+                            color: AppConstants.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Historical: ${channel['historical']}',
+                          style: AppConstants.bodySmall.copyWith(
                             color: AppConstants.textSecondary,
                           ),
                         ),
@@ -1993,6 +2005,279 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           ),
         ),
       ],
+    );
+  }
+
+  /// Category Sales Distribution (Historical)
+  Widget _buildCategorySalesDistribution() {
+    final categories = [
+      {
+        'name': 'Main Course',
+        'actual': 280,
+        'revenue': '₱17,500',
+        'color': AppConstants.primaryOrange,
+        'icon': Icons.restaurant,
+      },
+      {
+        'name': 'Beverages',
+        'actual': 178,
+        'revenue': '₱8,900',
+        'color': Colors.blue,
+        'icon': Icons.local_cafe,
+      },
+      {
+        'name': 'Appetizers',
+        'actual': 105,
+        'revenue': '₱5,250',
+        'color': AppConstants.successGreen,
+        'icon': Icons.fastfood,
+      },
+      {
+        'name': 'Desserts',
+        'actual': 78,
+        'revenue': '₱3,900',
+        'color': Colors.pink,
+        'icon': Icons.cake,
+      },
+      {
+        'name': 'Sides',
+        'actual': 72,
+        'revenue': '₱2,880',
+        'color': AppConstants.warningYellow,
+        'icon': Icons.food_bank,
+      },
+    ];
+
+    final maxValue = 280;
+
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      decoration: BoxDecoration(
+        color: AppConstants.cardBackground,
+        borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+        border: Border.all(color: AppConstants.dividerColor, width: 1),
+      ),
+      child: Column(
+        children: [
+          ...categories.map((category) {
+            final percentage = (category['actual'] as int) / maxValue;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppConstants.paddingMedium),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: (category['color'] as Color).withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          category['icon'] as IconData,
+                          color: category['color'] as Color,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: AppConstants.paddingSmall),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              category['name'] as String,
+                              style: AppConstants.bodyMedium.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              category['revenue'] as String,
+                              style: AppConstants.bodySmall.copyWith(
+                                color: AppConstants.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        '${category['actual']} orders',
+                        style: AppConstants.bodyLarge.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: category['color'] as Color,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: percentage,
+                      minHeight: 8,
+                      backgroundColor: AppConstants.dividerColor,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        category['color'] as Color,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
+  /// Order Channel Distribution (Historical)
+  Widget _buildOrderChannelDistribution() {
+    final channels = [
+      {
+        'name': 'Dine-In',
+        'percentage': 65,
+        'orders': 470,
+        'revenue': '₱29,400',
+        'color': AppConstants.primaryOrange,
+        'icon': Icons.restaurant_menu,
+        'peak': 'Sat-Sun Lunch & Dinner',
+      },
+      {
+        'name': 'Takeout',
+        'percentage': 25,
+        'orders': 181,
+        'revenue': '₱11,300',
+        'color': Colors.blue,
+        'icon': Icons.shopping_bag,
+        'peak': 'Weekday Lunch',
+      },
+      {
+        'name': 'Delivery',
+        'percentage': 10,
+        'orders': 74,
+        'revenue': '₱4,530',
+        'color': AppConstants.successGreen,
+        'icon': Icons.delivery_dining,
+        'peak': 'Rainy Days, Late Night',
+      },
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      decoration: BoxDecoration(
+        color: AppConstants.cardBackground,
+        borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+        border: Border.all(color: AppConstants.dividerColor, width: 1),
+      ),
+      child: Column(
+        children: [
+          // Visual percentage bar
+          Row(
+            children: channels.map((channel) {
+              final isFirst = channel == channels.first;
+              final isLast = channel == channels.last;
+              
+              return Expanded(
+                flex: channel['percentage'] as int,
+                child: Container(
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: channel['color'] as Color,
+                    borderRadius: BorderRadius.only(
+                      topLeft: isFirst ? const Radius.circular(8) : Radius.zero,
+                      bottomLeft: isFirst ? const Radius.circular(8) : Radius.zero,
+                      topRight: isLast ? const Radius.circular(8) : Radius.zero,
+                      bottomRight: isLast ? const Radius.circular(8) : Radius.zero,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${channel['percentage']}%',
+                      style: AppConstants.bodySmall.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: AppConstants.paddingLarge),
+          
+          // Channel details
+          ...channels.map((channel) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: AppConstants.paddingMedium),
+              padding: const EdgeInsets.all(AppConstants.paddingMedium),
+              decoration: BoxDecoration(
+                color: AppConstants.darkSecondary,
+                borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+                border: Border.all(
+                  color: (channel['color'] as Color).withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: (channel['color'] as Color).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      channel['icon'] as IconData,
+                      color: channel['color'] as Color,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: AppConstants.paddingMedium),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          channel['name'] as String,
+                          style: AppConstants.bodyLarge.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${channel['orders']} orders • ${channel['revenue']}',
+                          style: AppConstants.bodyMedium.copyWith(
+                            color: AppConstants.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.access_time,
+                              size: 14,
+                              color: AppConstants.textSecondary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Peak: ${channel['peak']}',
+                              style: AppConstants.bodySmall.copyWith(
+                                color: AppConstants.textSecondary,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
+      ),
     );
   }
 
@@ -2569,185 +2854,930 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   }
 
   /// Comparison Overlay Modal
-  Widget _buildComparisonOverlay() {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _showComparisonOverlay = false;
-        });
-      },
-      child: Container(
-        color: Colors.black.withOpacity(0.6),
-        child: Center(
-          child: GestureDetector(
-            onTap: () {}, // Prevent closing when tapping the modal
-            child: Container(
-              margin: const EdgeInsets.all(AppConstants.paddingLarge),
-              padding: const EdgeInsets.all(AppConstants.paddingLarge),
-              decoration: BoxDecoration(
-                color: AppConstants.darkSecondary,
-                borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
-                border: Border.all(color: AppConstants.dividerColor, width: 1),
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Historical vs Forecast',
-                          style: AppConstants.headingMedium,
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () {
-                            setState(() {
-                              _showComparisonOverlay = false;
-                            });
-                          },
+  /// Comparison tab
+  Widget _buildComparisonTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(AppConstants.paddingMedium),
+            decoration: BoxDecoration(
+              color: AppConstants.cardBackground,
+              borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+              border: Border.all(color: AppConstants.dividerColor),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppConstants.primaryOrange.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.compare_arrows,
+                    color: AppConstants.primaryOrange,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: AppConstants.paddingSmall),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Historical vs Forecast Comparison',
+                        style: AppConstants.headingSmall,
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Compare actual performance with AI predictions',
+                        style: TextStyle(
+                          fontSize: 12,
                           color: AppConstants.textSecondary,
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: AppConstants.paddingLarge),
-                    
-                    // Comparison Table
-                    _buildComparisonRow(
-                      'Total Sales',
-                      '₱45,230',
-                      '₱58,450',
-                      29.2,
-                      true,
-                    ),
-                    const Divider(color: AppConstants.dividerColor),
-                    _buildComparisonRow(
-                      'Total Orders',
-                      '725',
-                      '890',
-                      22.8,
-                      true,
-                    ),
-                    const Divider(color: AppConstants.dividerColor),
-                    _buildComparisonRow(
-                      'Avg. Order Value',
-                      '₱62.40',
-                      '₱65.67',
-                      5.2,
-                      true,
-                    ),
-                    const Divider(color: AppConstants.dividerColor),
-                    _buildComparisonRow(
-                      'Customer Return Rate',
-                      '68%',
-                      '72%',
-                      5.9,
-                      true,
-                    ),
-                    const Divider(color: AppConstants.dividerColor),
-                    _buildComparisonRow(
-                      'Peak Hours',
-                      '1PM - 3PM',
-                      '12PM - 2PM',
-                      null,
-                      null,
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
-        ),
+          const SizedBox(height: AppConstants.paddingLarge),
+
+          // Key Metrics Comparison
+          const Text(
+            'Key Metrics Comparison',
+            style: AppConstants.headingSmall,
+          ),
+          const SizedBox(height: AppConstants.paddingMedium),
+          _buildMetricsComparison(),
+          const SizedBox(height: AppConstants.paddingLarge),
+
+          // Sales Trend Comparison Chart
+          const Text(
+            'Sales Trend: Historical vs Forecast',
+            style: AppConstants.headingSmall,
+          ),
+          const SizedBox(height: AppConstants.paddingMedium),
+          _buildSalesTrendComparison(),
+          const SizedBox(height: AppConstants.paddingLarge),
+
+          // Category Performance Comparison
+          const Text(
+            'Category Performance Comparison',
+            style: AppConstants.headingSmall,
+          ),
+          const SizedBox(height: AppConstants.paddingMedium),
+          _buildCategoryComparison(),
+          const SizedBox(height: AppConstants.paddingLarge),
+
+          // Channel Distribution Comparison
+          const Text(
+            'Order Channel Distribution',
+            style: AppConstants.headingSmall,
+          ),
+          const SizedBox(height: AppConstants.paddingMedium),
+          _buildChannelComparison(),
+          const SizedBox(height: AppConstants.paddingLarge),
+
+          // Insights & Recommendations
+          const Text(
+            'Key Insights',
+            style: AppConstants.headingSmall,
+          ),
+          const SizedBox(height: AppConstants.paddingMedium),
+          _buildComparisonInsights(),
+        ],
       ),
     );
   }
 
-  Widget _buildComparisonRow(
-    String label,
-    String historical,
-    String forecast,
-    double? percentDiff,
-    bool? isIncrease,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppConstants.paddingMedium),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              label,
-              style: AppConstants.bodyLarge.copyWith(fontWeight: FontWeight.bold),
-            ),
+  /// Metrics Comparison Cards
+  Widget _buildMetricsComparison() {
+    final metrics = [
+      {
+        'title': 'Total Revenue',
+        'historical': '₱45,230',
+        'forecast': '₱58,450',
+        'difference': '+29.2%',
+        'isIncrease': true,
+        'icon': Icons.trending_up,
+        'color': AppConstants.successGreen,
+      },
+      {
+        'title': 'Total Orders',
+        'historical': '725',
+        'forecast': '890',
+        'difference': '+22.8%',
+        'isIncrease': true,
+        'icon': Icons.receipt,
+        'color': AppConstants.primaryOrange,
+      },
+      {
+        'title': 'Avg. Order Value',
+        'historical': '₱62.40',
+        'forecast': '₱65.67',
+        'difference': '+5.2%',
+        'isIncrease': true,
+        'icon': Icons.shopping_cart,
+        'color': Colors.blue,
+      },
+    ];
+
+    return Column(
+      children: metrics.map((metric) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: AppConstants.paddingMedium),
+          padding: const EdgeInsets.all(AppConstants.paddingMedium),
+          decoration: BoxDecoration(
+            color: AppConstants.cardBackground,
+            borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+            border: Border.all(color: AppConstants.dividerColor, width: 1),
           ),
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Historical',
-                  style: AppConstants.bodySmall.copyWith(
-                    color: AppConstants.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  historical,
-                  style: AppConstants.bodyLarge,
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Forecast',
-                  style: AppConstants.bodySmall.copyWith(
-                    color: AppConstants.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  forecast,
-                  style: AppConstants.bodyLarge.copyWith(
-                    color: AppConstants.primaryOrange,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (percentDiff != null && isIncrease != null)
-            Expanded(
-              flex: 1,
-              child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Title row
+              Row(
                 children: [
                   Icon(
-                    isIncrease ? Icons.arrow_upward : Icons.arrow_downward,
-                    color: isIncrease ? AppConstants.successGreen : Colors.red,
-                    size: 16,
+                    metric['icon'] as IconData,
+                    color: metric['color'] as Color,
+                    size: 20,
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: AppConstants.paddingSmall),
                   Text(
-                    '${percentDiff.toStringAsFixed(1)}%',
-                    style: AppConstants.bodySmall.copyWith(
-                      color: isIncrease ? AppConstants.successGreen : Colors.red,
+                    metric['title'] as String,
+                    style: AppConstants.bodyLarge.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
               ),
-            )
-          else
-            const Expanded(flex: 1, child: SizedBox()),
+              const SizedBox(height: AppConstants.paddingMedium),
+              
+              // Values row
+              Row(
+                children: [
+                  // Historical
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                      decoration: BoxDecoration(
+                        color: AppConstants.darkSecondary.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+                        border: Border.all(
+                          color: AppConstants.textSecondary.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Historical',
+                            style: AppConstants.bodySmall.copyWith(
+                              color: AppConstants.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            metric['historical'] as String,
+                            style: AppConstants.headingSmall.copyWith(
+                              color: AppConstants.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  
+                  // Arrow and difference
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.arrow_forward,
+                          color: AppConstants.primaryOrange,
+                          size: 20,
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: (metric['isIncrease'] as bool
+                                ? AppConstants.successGreen
+                                : Colors.red).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                metric['isIncrease'] as bool
+                                    ? Icons.arrow_upward
+                                    : Icons.arrow_downward,
+                                color: metric['isIncrease'] as bool
+                                    ? AppConstants.successGreen
+                                    : Colors.red,
+                                size: 12,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                metric['difference'] as String,
+                                style: AppConstants.bodySmall.copyWith(
+                                  color: metric['isIncrease'] as bool
+                                      ? AppConstants.successGreen
+                                      : Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Forecast
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                      decoration: BoxDecoration(
+                        color: AppConstants.primaryOrange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+                        border: Border.all(
+                          color: AppConstants.primaryOrange.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Forecast',
+                            style: AppConstants.bodySmall.copyWith(
+                              color: AppConstants.primaryOrange,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            metric['forecast'] as String,
+                            style: AppConstants.headingSmall.copyWith(
+                              color: AppConstants.primaryOrange,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  /// Sales Trend Comparison Chart
+  Widget _buildSalesTrendComparison() {
+    final historicalSpots = [
+      const FlSpot(0, 8500),
+      const FlSpot(1, 10200),
+      const FlSpot(2, 9800),
+      const FlSpot(3, 12500),
+      const FlSpot(4, 15200),
+      const FlSpot(5, 14800),
+      const FlSpot(6, 16500),
+    ];
+    
+    final forecastSpots = [
+      const FlSpot(0, 8200),
+      const FlSpot(1, 9900),
+      const FlSpot(2, 10500),
+      const FlSpot(3, 12200),
+      const FlSpot(4, 15600),
+      const FlSpot(5, 15200),
+      const FlSpot(6, 17200),
+    ];
+    
+    final labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+    return Container(
+      height: 300,
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      decoration: BoxDecoration(
+        color: AppConstants.cardBackground,
+        borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+        border: Border.all(color: AppConstants.dividerColor, width: 1),
+      ),
+      child: Column(
+        children: [
+          // Legend
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: AppConstants.successGreen,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Historical Sales',
+                    style: AppConstants.bodySmall.copyWith(
+                      color: AppConstants.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 24),
+              Row(
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: AppConstants.primaryOrange,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Forecast Sales',
+                    style: AppConstants.bodySmall.copyWith(
+                      color: AppConstants.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: AppConstants.paddingMedium),
+          Expanded(
+            child: LineChart(
+              LineChartData(
+                maxY: 18000,
+                minY: 0,
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: true,
+                  horizontalInterval: 2000,
+                  verticalInterval: 1,
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: AppConstants.dividerColor.withOpacity(0.3),
+                      strokeWidth: 1,
+                    );
+                  },
+                  getDrawingVerticalLine: (value) {
+                    return FlLine(
+                      color: AppConstants.dividerColor.withOpacity(0.3),
+                      strokeWidth: 1,
+                    );
+                  },
+                ),
+                titlesData: FlTitlesData(
+                  rightTitles: AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 50,
+                      interval: 2000,
+                      getTitlesWidget: (value, meta) {
+                        if (value == 0) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: Text(
+                            '₱${(value / 1000).toStringAsFixed(0)}K',
+                            style: AppConstants.bodySmall.copyWith(fontSize: 10),
+                            textAlign: TextAlign.right,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      interval: 1,
+                      getTitlesWidget: (value, meta) {
+                        if (value.toInt() < labels.length) {
+                          return Text(
+                            labels[value.toInt()],
+                            style: AppConstants.bodySmall.copyWith(fontSize: 10),
+                          );
+                        }
+                        return const Text('');
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                lineBarsData: [
+                  // Historical line
+                  LineChartBarData(
+                    spots: historicalSpots,
+                    isCurved: true,
+                    color: AppConstants.successGreen,
+                    barWidth: 3,
+                    dotData: FlDotData(show: true),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: AppConstants.successGreen.withOpacity(0.1),
+                    ),
+                  ),
+                  // Forecast line
+                  LineChartBarData(
+                    spots: forecastSpots,
+                    isCurved: true,
+                    color: AppConstants.primaryOrange,
+                    barWidth: 3,
+                    dotData: FlDotData(show: true),
+                    dashArray: [5, 5],
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: AppConstants.primaryOrange.withOpacity(0.1),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
+    );
+  }
+
+  /// Category Comparison
+  Widget _buildCategoryComparison() {
+    final categories = [
+      {
+        'name': 'Main Course',
+        'historical': 280,
+        'forecast': 340,
+        'color': AppConstants.primaryOrange,
+        'icon': Icons.restaurant,
+      },
+      {
+        'name': 'Beverages',
+        'historical': 178,
+        'forecast': 210,
+        'color': Colors.blue,
+        'icon': Icons.local_cafe,
+      },
+      {
+        'name': 'Appetizers',
+        'historical': 105,
+        'forecast': 120,
+        'color': AppConstants.successGreen,
+        'icon': Icons.fastfood,
+      },
+      {
+        'name': 'Desserts',
+        'historical': 78,
+        'forecast': 85,
+        'color': Colors.pink,
+        'icon': Icons.cake,
+      },
+      {
+        'name': 'Sides',
+        'historical': 72,
+        'forecast': 65,
+        'color': AppConstants.warningYellow,
+        'icon': Icons.food_bank,
+      },
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      decoration: BoxDecoration(
+        color: AppConstants.cardBackground,
+        borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+        border: Border.all(color: AppConstants.dividerColor, width: 1),
+      ),
+      child: Column(
+        children: categories.map((category) {
+          final historical = category['historical'] as int;
+          final forecast = category['forecast'] as int;
+          final change = ((forecast - historical) / historical * 100);
+          final isIncrease = change > 0;
+          
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppConstants.paddingMedium),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: (category['color'] as Color).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        category['icon'] as IconData,
+                        color: category['color'] as Color,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: AppConstants.paddingSmall),
+                    Expanded(
+                      child: Text(
+                        category['name'] as String,
+                        style: AppConstants.bodyLarge.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: (isIncrease
+                            ? AppConstants.successGreen
+                            : Colors.red).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isIncrease ? Icons.arrow_upward : Icons.arrow_downward,
+                            color: isIncrease ? AppConstants.successGreen : Colors.red,
+                            size: 12,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${change.abs().toStringAsFixed(0)}%',
+                            style: AppConstants.bodySmall.copyWith(
+                              color: isIncrease ? AppConstants.successGreen : Colors.red,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppConstants.paddingSmall),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Historical: $historical orders',
+                            style: AppConstants.bodySmall.copyWith(
+                              color: AppConstants.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: historical / 340,
+                              minHeight: 6,
+                              backgroundColor: AppConstants.dividerColor,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppConstants.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppConstants.paddingMedium),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Forecast: $forecast orders',
+                            style: AppConstants.bodySmall.copyWith(
+                              color: AppConstants.primaryOrange,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: forecast / 340,
+                              minHeight: 6,
+                              backgroundColor: AppConstants.dividerColor,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                category['color'] as Color,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  /// Channel Comparison
+  Widget _buildChannelComparison() {
+    final channels = [
+      {
+        'name': 'Dine-In',
+        'historical': 470,
+        'forecast': 540,
+        'historicalPct': 65,
+        'forecastPct': 65,
+        'color': AppConstants.primaryOrange,
+        'icon': Icons.restaurant_menu,
+      },
+      {
+        'name': 'Takeout',
+        'historical': 181,
+        'forecast': 208,
+        'historicalPct': 25,
+        'forecastPct': 25,
+        'color': Colors.blue,
+        'icon': Icons.shopping_bag,
+      },
+      {
+        'name': 'Delivery',
+        'historical': 74,
+        'forecast': 83,
+        'historicalPct': 10,
+        'forecastPct': 10,
+        'color': AppConstants.successGreen,
+        'icon': Icons.delivery_dining,
+      },
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      decoration: BoxDecoration(
+        color: AppConstants.cardBackground,
+        borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+        border: Border.all(color: AppConstants.dividerColor, width: 1),
+      ),
+      child: Column(
+        children: [
+          // Historical bar
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Historical Distribution',
+                style: AppConstants.bodySmall.copyWith(
+                  color: AppConstants.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: channels.map((channel) {
+                  final isFirst = channel == channels.first;
+                  final isLast = channel == channels.last;
+                  
+                  return Expanded(
+                    flex: channel['historicalPct'] as int,
+                    child: Container(
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: (channel['color'] as Color).withOpacity(0.5),
+                        borderRadius: BorderRadius.only(
+                          topLeft: isFirst ? const Radius.circular(6) : Radius.zero,
+                          bottomLeft: isFirst ? const Radius.circular(6) : Radius.zero,
+                          topRight: isLast ? const Radius.circular(6) : Radius.zero,
+                          bottomRight: isLast ? const Radius.circular(6) : Radius.zero,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${channel['historicalPct']}%',
+                          style: AppConstants.bodySmall.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppConstants.paddingMedium),
+          
+          // Forecast bar
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Forecast Distribution',
+                style: AppConstants.bodySmall.copyWith(
+                  color: AppConstants.primaryOrange,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: channels.map((channel) {
+                  final isFirst = channel == channels.first;
+                  final isLast = channel == channels.last;
+                  
+                  return Expanded(
+                    flex: channel['forecastPct'] as int,
+                    child: Container(
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: channel['color'] as Color,
+                        borderRadius: BorderRadius.only(
+                          topLeft: isFirst ? const Radius.circular(6) : Radius.zero,
+                          bottomLeft: isFirst ? const Radius.circular(6) : Radius.zero,
+                          topRight: isLast ? const Radius.circular(6) : Radius.zero,
+                          bottomRight: isLast ? const Radius.circular(6) : Radius.zero,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${channel['forecastPct']}%',
+                          style: AppConstants.bodySmall.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppConstants.paddingLarge),
+          
+          // Channel details
+          ...channels.map((channel) {
+            final historical = channel['historical'] as int;
+            final forecast = channel['forecast'] as int;
+            final change = ((forecast - historical) / historical * 100);
+            
+            return Container(
+              margin: const EdgeInsets.only(bottom: AppConstants.paddingSmall),
+              padding: const EdgeInsets.all(AppConstants.paddingMedium),
+              decoration: BoxDecoration(
+                color: AppConstants.darkSecondary,
+                borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+                border: Border.all(
+                  color: (channel['color'] as Color).withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    channel['icon'] as IconData,
+                    color: channel['color'] as Color,
+                    size: 20,
+                  ),
+                  const SizedBox(width: AppConstants.paddingSmall),
+                  Expanded(
+                    child: Text(
+                      channel['name'] as String,
+                      style: AppConstants.bodyMedium.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '$historical → $forecast orders',
+                        style: AppConstants.bodySmall.copyWith(
+                          color: AppConstants.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '+${change.toStringAsFixed(0)}%',
+                        style: AppConstants.bodySmall.copyWith(
+                          color: AppConstants.successGreen,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
+  /// Comparison Insights
+  Widget _buildComparisonInsights() {
+    final insights = [
+      {
+        'icon': Icons.trending_up,
+        'color': AppConstants.successGreen,
+        'title': 'Strong Growth Projection',
+        'description': 'Revenue forecast shows a 29.2% increase, driven by upcoming events and weather patterns.',
+      },
+      {
+        'icon': Icons.restaurant,
+        'color': AppConstants.primaryOrange,
+        'title': 'Main Course Surge',
+        'description': 'Main Course category expected to grow by 21%, suggesting increased demand for full meals.',
+      },
+      {
+        'icon': Icons.delivery_dining,
+        'color': Colors.blue,
+        'title': 'Channel Consistency',
+        'description': 'Order channel distribution remains stable at 65-25-10, with growth across all channels.',
+      },
+      {
+        'icon': Icons.lightbulb_outline,
+        'color': AppConstants.warningYellow,
+        'title': 'Recommended Actions',
+        'description': 'Stock up on Pasta ingredients. Add 2 servers for peak hours. Promote comfort food during rainy days.',
+      },
+    ];
+
+    return Column(
+      children: insights.map((insight) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: AppConstants.paddingMedium),
+          padding: const EdgeInsets.all(AppConstants.paddingMedium),
+          decoration: BoxDecoration(
+            color: AppConstants.cardBackground,
+            borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+            border: Border.all(
+              color: (insight['color'] as Color).withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: (insight['color'] as Color).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  insight['icon'] as IconData,
+                  color: insight['color'] as Color,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: AppConstants.paddingSmall),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      insight['title'] as String,
+                      style: AppConstants.bodyLarge.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      insight['description'] as String,
+                      style: AppConstants.bodySmall.copyWith(
+                        color: AppConstants.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 
