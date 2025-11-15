@@ -6,144 +6,167 @@ import '../utils/formatters.dart';
 /// Widget to display an order card
 class OrderCard extends StatelessWidget {
   final Order order;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   const OrderCard({
     super.key,
     required this.order,
-    this.onTap,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: AppConstants.paddingSmall),
-        padding: const EdgeInsets.all(AppConstants.paddingMedium),
-        decoration: BoxDecoration(
-          color: AppConstants.cardBackground,
-          borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
-          border: Border.all(
-            color: AppConstants.dividerColor,
-            width: 1,
-          ),
+    return Card(
+      color: AppConstants.cardBackground,
+      margin: const EdgeInsets.only(bottom: AppConstants.paddingMedium),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+        side: BorderSide(
+          color: _getStatusColor(order.status).withOpacity(0.3),
+          width: 1,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.receipt_long,
-                      color: AppConstants.primaryOrange,
-                      size: AppConstants.iconMedium,
-                    ),
-                    const SizedBox(width: AppConstants.paddingSmall),
-                    Text(
-                      'Order #${order.id}',
-                      style: AppConstants.headingSmall,
-                    ),
-                  ],
-                ),
-                _buildStatusChip(),
-              ],
-            ),
-            const SizedBox(height: AppConstants.paddingSmall),
-            Row(
-              children: [
-                Icon(
-                  Icons.table_restaurant,
-                  size: 16,
-                  color: AppConstants.textSecondary,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'Table ${order.tableNumber}',
-                  style: AppConstants.bodyMedium,
-                ),
-                const SizedBox(width: AppConstants.paddingMedium),
-                Icon(
-                  Icons.access_time,
-                  size: 16,
-                  color: AppConstants.textSecondary,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  Formatters.formatTime(order.timestamp),
-                  style: AppConstants.bodyMedium,
-                ),
-              ],
-            ),
-            const SizedBox(height: AppConstants.paddingSmall),
-            Text(
-              '${order.items.length} items',
-              style: AppConstants.bodySmall,
-            ),
-            const SizedBox(height: AppConstants.paddingSmall),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Total',
-                  style: AppConstants.bodyMedium,
-                ),
-                Text(
-                  Formatters.formatCurrency(order.totalAmount),
-                  style: AppConstants.headingSmall.copyWith(
-                    color: AppConstants.primaryOrange,
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+        child: Padding(
+          padding: const EdgeInsets.all(AppConstants.paddingMedium),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Order ID
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.receipt_long,
+                        color: AppConstants.primaryOrange,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Order #${order.id}',
+                        style: AppConstants.bodyLarge.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
-          ],
+                  // Status badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _getStatusColor(order.status).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _getStatusColor(order.status),
+                      ),
+                    ),
+                    child: Text(
+                      _getStatusText(order.status),
+                      style: AppConstants.bodySmall.copyWith(
+                        color: _getStatusColor(order.status),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppConstants.paddingSmall),
+              const Divider(color: AppConstants.dividerColor, height: 1),
+              const SizedBox(height: AppConstants.paddingSmall),
+              
+              // Table and time info
+              Row(
+                children: [
+                  // Table number
+                  Icon(
+                    Icons.table_restaurant,
+                    color: AppConstants.textSecondary,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Table ${order.tableNumber}',
+                    style: AppConstants.bodyMedium,
+                  ),
+                  const SizedBox(width: AppConstants.paddingMedium),
+                  // Time
+                  Icon(
+                    Icons.access_time,
+                    color: AppConstants.textSecondary,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    Formatters.formatTime(order.timestamp),
+                    style: AppConstants.bodyMedium.copyWith(
+                      color: AppConstants.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppConstants.paddingSmall),
+              
+              // Items count and total
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${order.items.length} item${order.items.length > 1 ? 's' : ''}',
+                    style: AppConstants.bodyMedium.copyWith(
+                      color: AppConstants.textSecondary,
+                    ),
+                  ),
+                  Text(
+                    Formatters.formatCurrency(order.totalAmount),
+                    style: AppConstants.bodyLarge.copyWith(
+                      color: AppConstants.primaryOrange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildStatusChip() {
-    Color color;
-    switch (order.status) {
+  Color _getStatusColor(OrderStatus status) {
+    switch (status) {
       case OrderStatus.pending:
-        color = AppConstants.warningYellow;
-        break;
+        return AppConstants.warningYellow;
       case OrderStatus.preparing:
-        color = Colors.blue;
-        break;
+        return Colors.blue;
       case OrderStatus.ready:
-        color = AppConstants.successGreen;
-        break;
-      case OrderStatus.served:
-        color = Colors.purple;
-        break;
+        return AppConstants.primaryOrange;
       case OrderStatus.completed:
-        color = AppConstants.successGreen;
-        break;
+        return AppConstants.successGreen;
       case OrderStatus.cancelled:
-        color = AppConstants.errorRed;
-        break;
+        return AppConstants.errorRed;
     }
+  }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppConstants.paddingSmall,
-        vertical: 4,
-      ),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
-      ),
-      child: Text(
-        order.status.toString().split('.').last.toUpperCase(),
-        style: AppConstants.bodySmall.copyWith(
-          color: color,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
+  String _getStatusText(OrderStatus status) {
+    switch (status) {
+      case OrderStatus.pending:
+        return 'PENDING';
+      case OrderStatus.preparing:
+        return 'PREPARING';
+      case OrderStatus.ready:
+        return 'READY';
+      case OrderStatus.completed:
+        return 'COMPLETED';
+      case OrderStatus.cancelled:
+        return 'CANCELLED';
+    }
   }
 }
