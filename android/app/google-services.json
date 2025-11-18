@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "267749204384",
+    "project_id": "smart-restaurant-pos",
+    "storage_bucket": "smart-restaurant-pos.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:267749204384:android:f7702bcb03944ee62bc4c5",
+        "android_client_info": {
+          "package_name": "com.example.smart_restupos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBmS4M4fWXj98gfm2m7Le3TuzUMwsN7eVM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

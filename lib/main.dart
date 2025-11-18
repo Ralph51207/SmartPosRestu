@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/order_management_screen.dart';
 import 'screens/table_management_screen.dart';
@@ -15,8 +17,10 @@ import 'utils/constants.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // TODO: Initialize Firebase
-  // await Firebase.initializeApp();
+  //Initialize Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+);
   
   runApp(const SmartServePOS());
 }
