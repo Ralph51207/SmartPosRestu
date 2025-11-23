@@ -46,6 +46,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '267749204384',
     projectId: 'smart-restaurant-pos',
     authDomain: 'smart-restaurant-pos.firebaseapp.com',
+    databaseURL: 'https://smart-restaurant-pos-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'smart-restaurant-pos.firebasestorage.app',
     measurementId: 'G-NQL89X0FL2',
   );
@@ -55,6 +56,7 @@ class DefaultFirebaseOptions {
     appId: '1:267749204384:android:f7702bcb03944ee62bc4c5',
     messagingSenderId: '267749204384',
     projectId: 'smart-restaurant-pos',
+    databaseURL: 'https://smart-restaurant-pos-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'smart-restaurant-pos.firebasestorage.app',
   );
 
@@ -63,6 +65,7 @@ class DefaultFirebaseOptions {
     appId: '1:267749204384:ios:043f184506e9c7f72bc4c5',
     messagingSenderId: '267749204384',
     projectId: 'smart-restaurant-pos',
+    databaseURL: 'https://smart-restaurant-pos-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'smart-restaurant-pos.firebasestorage.app',
     iosBundleId: 'com.example.smartRestupos',
   );
@@ -72,6 +75,7 @@ class DefaultFirebaseOptions {
     appId: '1:267749204384:ios:043f184506e9c7f72bc4c5',
     messagingSenderId: '267749204384',
     projectId: 'smart-restaurant-pos',
+    databaseURL: 'https://smart-restaurant-pos-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'smart-restaurant-pos.firebasestorage.app',
     iosBundleId: 'com.example.smartRestupos',
   );
@@ -82,6 +86,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '267749204384',
     projectId: 'smart-restaurant-pos',
     authDomain: 'smart-restaurant-pos.firebaseapp.com',
+    databaseURL: 'https://smart-restaurant-pos-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'smart-restaurant-pos.firebasestorage.app',
     measurementId: 'G-HRFFSTB6N5',
   );

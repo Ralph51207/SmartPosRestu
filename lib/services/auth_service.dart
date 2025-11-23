@@ -1,11 +1,20 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 /// Firebase authentication service
 /// Handles user authentication and session management
 class AuthService {
+  static const String _databaseUrl =
+      'https://smart-restaurant-pos-default-rtdb.asia-southeast1.firebasedatabase.app';
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final DatabaseReference _database = FirebaseDatabase.instance.ref();
+  final FirebaseDatabase _databaseInstance = FirebaseDatabase.instanceFor(
+    app: Firebase.app(),
+    databaseURL: _databaseUrl,
+  );
+
+  DatabaseReference get _database => _databaseInstance.ref();
 
   /// Get current user
   User? get currentUser => _auth.currentUser;

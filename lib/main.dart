@@ -20,10 +20,20 @@ import 'utils/constants.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  //Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-);
+  // Initialize Firebase (check if already initialized to avoid duplicate app error)
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    print('✅ Firebase initialized successfully');
+  } catch (e) {
+    if (e.toString().contains('duplicate-app')) {
+      print('⚠️ Firebase already initialized');
+    } else {
+      print('❌ Firebase initialization error: $e');
+      rethrow;
+    }
+  }
   
   runApp(const SmartServePOS());
 }

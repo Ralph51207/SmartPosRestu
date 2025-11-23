@@ -1,17 +1,37 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import '../models/menu_item_model.dart';
 
 /// Menu Service
 /// Handles CRUD operations for menu items in Firebase Realtime Database
 class MenuService {
-  final DatabaseReference _database = FirebaseDatabase.instance.ref();
+  static const String _databaseUrl =
+      'https://smart-restaurant-pos-default-rtdb.asia-southeast1.firebasedatabase.app';
+
+  final FirebaseDatabase _databaseInstance = FirebaseDatabase.instanceFor(
+    app: Firebase.app(),
+    databaseURL: _databaseUrl,
+  );
+
+  DatabaseReference get _menuRef => _databaseInstance.ref('menu');
 
   /// Get all menu items as a stream
   Stream<List<MenuItem>> getMenuItemsStream() {
-    return _database.child('menu').onValue.map((event) {
+    print('📡 Setting up menu items stream listener...');
+    return _menuRef.onValue.map((event) {
+      print('📡 Received data event from Firebase');
+      print('📡 Event snapshot exists: ${event.snapshot.exists}');
+      print('📡 Event snapshot value type: ${event.snapshot.value.runtimeType}');
+      
       final menuMap = event.snapshot.value as Map<dynamic, dynamic>?;
-      if (menuMap == null) return <MenuItem>[];
+      if (menuMap == null) {
+        print('⚠️ No menu data found in Firebase (menuMap is null)');
+        return <MenuItem>[];
+      }
 
+      print('📡 Found ${menuMap.length} menu items in Firebase');
+      print('📡 Menu IDs: ${menuMap.keys.toList()}');
+      
       return menuMap.entries.map((entry) {
         final itemData = Map<String, dynamic>.from(entry.value as Map);
         return MenuItem.fromJson(itemData);
@@ -22,7 +42,7 @@ class MenuService {
   /// Get a single menu item by ID
   Future<MenuItem?> getMenuItemById(String itemId) async {
     try {
-      final snapshot = await _database.child('menu/$itemId').get();
+      final snapshot = await _menuRef.child(itemId).get();
       if (snapshot.exists) {
         final itemData = Map<String, dynamic>.from(snapshot.value as Map);
         return MenuItem.fromJson(itemData);
@@ -37,8 +57,7 @@ class MenuService {
   /// Get menu items by category
   Future<List<MenuItem>> getMenuItemsByCategory(MenuCategory category) async {
     try {
-      final snapshot = await _database
-          .child('menu')
+        final snapshot = await _menuRef
           .orderByChild('category')
           .equalTo(category.toString().split('.').last)
           .get();
@@ -60,8 +79,7 @@ class MenuService {
   /// Get available menu items only
   Future<List<MenuItem>> getAvailableMenuItems() async {
     try {
-      final snapshot = await _database
-          .child('menu')
+        final snapshot = await _menuRef
           .orderByChild('isAvailable')
           .equalTo(true)
           .get();
@@ -83,7 +101,13 @@ class MenuService {
   /// Create a new menu item
   Future<Map<String, dynamic>> createMenuItem(MenuItem item) async {
     try {
-      await _database.child('menu/${item.id}').set(item.toJson());
+      print('📝 Creating menu item: ${item.name} with ID: ${item.id}');
+      print('📝 Data to save: ${item.toJson()}');
+      print('📝 Database URL: https://smart-restaurant-pos-default-rtdb.asia-southeast1.firebasedatabase.app');
+      
+      await _menuRef.child(item.id).set(item.toJson());
+      
+      print('✅ Menu item created successfully in Firebase');
 
       return {
         'success': true,
@@ -91,6 +115,7 @@ class MenuService {
         'itemId': item.id,
       };
     } catch (e) {
+      print('❌ Error creating menu item: $e');
       return {
         'success': false,
         'error': 'Failed to create menu item: ${e.toString()}',
@@ -101,7 +126,7 @@ class MenuService {
   /// Update menu item
   Future<Map<String, dynamic>> updateMenuItem(MenuItem item) async {
     try {
-      await _database.child('menu/${item.id}').update(item.toJson());
+      await _menuRef.child(item.id).update(item.toJson());
 
       return {
         'success': true,
@@ -121,7 +146,7 @@ class MenuService {
     bool isAvailable,
   ) async {
     try {
-      await _database.child('menu/$itemId').update({
+      await _menuRef.child(itemId).update({
         'isAvailable': isAvailable,
       });
 
@@ -140,10 +165,10 @@ class MenuService {
   /// Increment sales count for a menu item
   Future<void> incrementSalesCount(String itemId) async {
     try {
-      final snapshot = await _database.child('menu/$itemId/salesCount').get();
+      final snapshot = await _menuRef.child(itemId).child('salesCount').get();
       final currentCount = (snapshot.value as int?) ?? 0;
       
-      await _database.child('menu/$itemId').update({
+      await _menuRef.child(itemId).update({
         'salesCount': currentCount + 1,
       });
     } catch (e) {
@@ -154,7 +179,7 @@ class MenuService {
   /// Delete a menu item
   Future<Map<String, dynamic>> deleteMenuItem(String itemId) async {
     try {
-      await _database.child('menu/$itemId').remove();
+      await _menuRef.child(itemId).remove();
 
       return {
         'success': true,
@@ -171,8 +196,7 @@ class MenuService {
   /// Get top-selling items
   Future<List<MenuItem>> getTopSellingItems({int limit = 5}) async {
     try {
-      final snapshot = await _database
-          .child('menu')
+        final snapshot = await _menuRef
           .orderByChild('salesCount')
           .limitToLast(limit)
           .get();
@@ -198,7 +222,7 @@ class MenuService {
   /// Search menu items by name
   Future<List<MenuItem>> searchMenuItems(String query) async {
     try {
-      final snapshot = await _database.child('menu').get();
+      final snapshot = await _menuRef.get();
       if (!snapshot.exists) return [];
 
       final menuMap = snapshot.value as Map<dynamic, dynamic>;
@@ -221,7 +245,7 @@ class MenuService {
   /// Get menu statistics
   Future<Map<String, dynamic>> getMenuStatistics() async {
     try {
-      final snapshot = await _database.child('menu').get();
+      final snapshot = await _menuRef.get();
       if (!snapshot.exists) {
         return {
           'totalItems': 0,

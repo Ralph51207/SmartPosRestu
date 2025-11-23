@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import '../models/sales_data_model.dart';
 import '../models/order_model.dart' as order_model;
@@ -8,7 +9,15 @@ import '../models/order_model.dart' as order_model;
 /// Uses Firestore for complex queries and historical data storage
 class AnalyticsService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final DatabaseReference _database = FirebaseDatabase.instance.ref();
+  static const String _databaseUrl =
+      'https://smart-restaurant-pos-default-rtdb.asia-southeast1.firebasedatabase.app';
+
+  final FirebaseDatabase _databaseInstance = FirebaseDatabase.instanceFor(
+    app: Firebase.app(),
+    databaseURL: _databaseUrl,
+  );
+
+  DatabaseReference get _ordersRef => _databaseInstance.ref('orders');
 
   /// Save daily sales summary to Firestore
   Future<Map<String, dynamic>> saveDailySales(SalesData data) async {
@@ -135,8 +144,7 @@ class AnalyticsService {
       final startOfDay = DateTime(today.year, today.month, today.day);
       final endOfDay = startOfDay.add(const Duration(days: 1));
 
-      final snapshot = await _database
-          .child('orders')
+        final snapshot = await _ordersRef
           .orderByChild('timestamp')
           .startAt(startOfDay.millisecondsSinceEpoch)
           .endAt(endOfDay.millisecondsSinceEpoch)

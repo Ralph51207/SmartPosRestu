@@ -1,14 +1,26 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import '../models/order_model.dart';
 
 /// Firebase database service for order management
 /// Handles CRUD operations for orders in real-time database
 class OrderService {
-  final DatabaseReference _database = FirebaseDatabase.instance.ref();
+  static const String _databaseUrl =
+      'https://smart-restaurant-pos-default-rtdb.asia-southeast1.firebasedatabase.app';
+
+  final FirebaseDatabase _databaseInstance = FirebaseDatabase.instanceFor(
+    app: Firebase.app(),
+    databaseURL: _databaseUrl,
+  );
+
+  DatabaseReference get _ordersRef => _databaseInstance.ref('orders');
+
+  DatabaseReference _orderRef(String orderId) =>
+      _databaseInstance.ref('orders/$orderId');
 
   /// Get orders stream (real-time updates)
   Stream<List<Order>> getOrdersStream() {
-    return _database.child('orders').onValue.map((event) {
+    return _ordersRef.onValue.map((event) {
       final orders = <Order>[];
       if (event.snapshot.value != null) {
         final data = event.snapshot.value as Map<dynamic, dynamic>;
@@ -23,7 +35,7 @@ class OrderService {
   /// Get single order by ID
   Future<Order?> getOrder(String orderId) async {
     try {
-      final snapshot = await _database.child('orders/$orderId').get();
+      final snapshot = await _orderRef(orderId).get();
       if (snapshot.exists) {
         return Order.fromJson(
             Map<String, dynamic>.from(snapshot.value as Map));
@@ -38,7 +50,7 @@ class OrderService {
   /// Create new order
   Future<void> createOrder(Order order) async {
     try {
-      await _database.child('orders/${order.id}').set(order.toJson());
+      await _orderRef(order.id).set(order.toJson());
     } catch (e) {
       print('Error creating order: $e');
       rethrow;
@@ -48,7 +60,7 @@ class OrderService {
   /// Update existing order
   Future<void> updateOrder(Order order) async {
     try {
-      await _database.child('orders/${order.id}').update(order.toJson());
+      await _orderRef(order.id).update(order.toJson());
     } catch (e) {
       print('Error updating order: $e');
       rethrow;
@@ -58,7 +70,7 @@ class OrderService {
   /// Update order status
   Future<void> updateOrderStatus(String orderId, OrderStatus status) async {
     try {
-      await _database.child('orders/$orderId').update({
+      await _orderRef(orderId).update({
         'status': status.toString().split('.').last,
       });
     } catch (e) {
@@ -70,7 +82,7 @@ class OrderService {
   /// Delete order
   Future<void> deleteOrder(String orderId) async {
     try {
-      await _database.child('orders/$orderId').remove();
+      await _orderRef(orderId).remove();
     } catch (e) {
       print('Error deleting order: $e');
       rethrow;
@@ -80,8 +92,7 @@ class OrderService {
   /// Get orders by table number
   Future<List<Order>> getOrdersByTable(String tableNumber) async {
     try {
-      final snapshot = await _database
-          .child('orders')
+      final snapshot = await _ordersRef
           .orderByChild('tableNumber')
           .equalTo(tableNumber)
           .get();
@@ -106,7 +117,7 @@ class OrderService {
       final today = DateTime.now();
       final startOfDay = DateTime(today.year, today.month, today.day);
 
-      final snapshot = await _database.child('orders').get();
+      final snapshot = await _ordersRef.get();
 
       final orders = <Order>[];
       if (snapshot.exists) {

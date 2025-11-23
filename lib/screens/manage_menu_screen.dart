@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/menu_item_model.dart';
+import '../services/menu_service.dart';
 import '../utils/constants.dart';
 import '../utils/formatters.dart';
+import '../utils/seed_menu_data.dart';
 
 /// Manage Menu Screen - Edit categories and dishes
 class ManageMenuScreen extends StatefulWidget {
@@ -12,9 +14,12 @@ class ManageMenuScreen extends StatefulWidget {
 }
 
 class _ManageMenuScreenState extends State<ManageMenuScreen> {
+  final MenuService _menuService = MenuService();
   MenuCategory? _selectedCategory; // null means "All Items"
-  final List<MenuItem> _menuItems = [];
+  String? _selectedCategoryLabel;
+  List<MenuItem> _menuItems = [];
   String _searchQuery = '';
+  bool _isLoading = true;
   
   // Custom categories storage (label, icon, category)
   final List<Map<String, dynamic>> _customCategories = [
@@ -30,113 +35,38 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
     _loadMenuItems();
   }
 
-  /// Load menu items
+  /// Load menu items from Firebase
   void _loadMenuItems() {
-    setState(() {
-      _menuItems.addAll([
-        // Main Course
-        MenuItem(
-          id: 'MENU001',
-          name: 'Spicy Edamame',
-          description: 'Steamed edamame tossed with chili garlic sauce, a classic appetizer',
-          price: 7.50,
-          category: MenuCategory.mainCourse,
-          isAvailable: true,
-          salesCount: 145,
-        ),
-        MenuItem(
-          id: 'MENU002',
-          name: 'Crispy Spring Rolls',
-          description: 'Hand-rolled vegetable spring rolls served with sweet chili dipping',
-          price: 9.00,
-          category: MenuCategory.mainCourse,
-          isAvailable: true,
-          salesCount: 134,
-        ),
-        MenuItem(
-          id: 'MENU003',
-          name: 'Grilled Salmon',
-          description: 'Perfectly seared salmon fillet with lemon asparagus and herbs',
-          price: 22.00,
-          category: MenuCategory.mainCourse,
-          isAvailable: true,
-          salesCount: 98,
-        ),
-        MenuItem(
-          id: 'MENU004',
-          name: 'Margherita Pizza',
-          description: 'Classic Italian pizza with tomato, mozzarella, and fresh basil',
-          price: 15.00,
-          category: MenuCategory.mainCourse,
-          isAvailable: true,
-          salesCount: 210,
-        ),
-        MenuItem(
-          id: 'MENU005',
-          name: 'Pasta Carbonara',
-          description: 'Creamy pasta with bacon, eggs, and parmesan cheese',
-          price: 17.00,
-          category: MenuCategory.mainCourse,
-          isAvailable: true,
-          salesCount: 156,
-        ),
-        
-        // Desserts
-        MenuItem(
-          id: 'MENU006',
-          name: 'Cheesecake',
-          description: 'Classic New York style cheesecake topped with a homemade berry compote',
-          price: 10.00,
-          category: MenuCategory.dessert,
-          isAvailable: true,
-          salesCount: 89,
-        ),
-        MenuItem(
-          id: 'MENU007',
-          name: 'Tiramisu',
-          description: 'Layers of coffee-soaked ladyfingers, mascarpone and cocoa',
-          price: 9.50,
-          category: MenuCategory.dessert,
-          isAvailable: true,
-          salesCount: 76,
-        ),
-        
-        // Beverages
-        MenuItem(
-          id: 'MENU008',
-          name: 'Fresh Orange Juice',
-          description: 'Freshly squeezed oranges, pure and refreshing',
-          price: 5.00,
-          category: MenuCategory.beverage,
-          isAvailable: true,
-          salesCount: 201,
-        ),
-        MenuItem(
-          id: 'MENU009',
-          name: 'Espresso',
-          description: 'Rich, intense shot of concentrated coffee',
-          price: 3.50,
-          category: MenuCategory.beverage,
-          isAvailable: true,
-          salesCount: 312,
-        ),
-        MenuItem(
-          id: 'MENU010',
-          name: 'Iced Latte',
-          description: 'Smooth espresso with cold milk over ice',
-          price: 5.50,
-          category: MenuCategory.beverage,
-          isAvailable: true,
-          salesCount: 267,
-        ),
-      ]);
+    setState(() => _isLoading = true);
+    
+    // Listen to real-time updates from Firebase
+    _menuService.getMenuItemsStream().listen((items) {
+      if (mounted) {
+        setState(() {
+          _menuItems = items;
+          _isLoading = false;
+        });
+      }
+    }, onError: (error) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading menu: $error'),
+            backgroundColor: AppConstants.errorRed,
+          ),
+        );
+      }
     });
   }
 
   /// Get filtered menu items
   List<MenuItem> get _filteredItems {
     return _menuItems.where((item) {
-      final matchesCategory = _selectedCategory == null || item.category == _selectedCategory;
+      final matchesCategory = _selectedCategory == null ||
+        (item.category == _selectedCategory &&
+          (_selectedCategoryLabel == null ||
+            item.categoryLabel == _selectedCategoryLabel));
       final matchesSearch = _searchQuery.isEmpty ||
           item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           item.description.toLowerCase().contains(_searchQuery.toLowerCase());
@@ -169,6 +99,48 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
           ],
         ),
         actions: [
+          // Seed data button (only show when menu is empty)
+          if (_menuItems.isEmpty && !_isLoading)
+            IconButton(
+              icon: const Icon(Icons.cloud_upload),
+              onPressed: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    backgroundColor: AppConstants.cardBackground,
+                    title: const Text('Seed Sample Data', style: AppConstants.headingSmall),
+                    content: const Text(
+                      'Add 10 sample menu items to get started?',
+                      style: AppConstants.bodyMedium,
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: Text('Cancel', style: TextStyle(color: AppConstants.textSecondary)),
+                      ),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryOrange),
+                        child: const Text('Add Sample Data'),
+                      ),
+                    ],
+                  ),
+                );
+                
+                if (confirmed == true) {
+                  await MenuSeeder().seedMenuData();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Sample menu data added successfully!'),
+                        backgroundColor: AppConstants.successGreen,
+                      ),
+                    );
+                  }
+                }
+              },
+              tooltip: 'Add Sample Data',
+            ),
           IconButton(
             icon: const Icon(Icons.add_circle_outline),
             onPressed: _showAddItemDialog,
@@ -180,8 +152,6 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
         children: [
           // Search bar
           _buildSearchBar(),
-
-          // Category tabs
           _buildCategoryTabs(),
 
           // Menu items list
@@ -264,12 +234,17 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
     );
   }
 
-  Widget _buildCategoryTab(String label, IconData icon, MenuCategory? category, {required bool canDelete}) {
-    final isSelected = _selectedCategory == category;
+  Widget _buildCategoryTab(String label, IconData icon, MenuCategory? category,
+      {required bool canDelete}) {
+    final isSelected = _selectedCategory == category &&
+        (_selectedCategoryLabel == null ||
+            category == null ||
+            _selectedCategoryLabel == label);
     return GestureDetector(
       onTap: () {
         setState(() {
           _selectedCategory = category;
+          _selectedCategoryLabel = category != null ? label : null;
         });
       },
       onLongPress: canDelete && category != null
@@ -394,6 +369,24 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
 
   /// Build menu list
   Widget _buildMenuList() {
+    if (_isLoading) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: AppConstants.primaryOrange),
+            const SizedBox(height: 16),
+            Text(
+              'Loading menu items...',
+              style: AppConstants.bodyMedium.copyWith(
+                color: AppConstants.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
     if (_filteredItems.isEmpty) {
       return Center(
         child: Column(
@@ -476,19 +469,19 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                         // Availability toggle
                         Switch(
                           value: item.isAvailable,
-                          onChanged: (value) {
-                            setState(() {
-                              final index = _menuItems.indexOf(item);
-                              _menuItems[index] = MenuItem(
-                                id: item.id,
-                                name: item.name,
-                                description: item.description,
-                                price: item.price,
-                                category: item.category,
-                                isAvailable: value,
-                                salesCount: item.salesCount,
+                          onChanged: (value) async {
+                            final result = await _menuService.updateItemAvailability(
+                              item.id,
+                              value,
+                            );
+                            if (result['success'] && mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(result['message']),
+                                  backgroundColor: AppConstants.successGreen,
+                                ),
                               );
-                            });
+                            }
                           },
                           activeColor: AppConstants.successGreen,
                         ),
@@ -524,7 +517,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                             borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
                           ),
                           child: Text(
-                            item.category.toString().split('.').last,
+                            item.categoryLabel,
                             style: AppConstants.bodySmall.copyWith(
                               color: AppConstants.textSecondary,
                             ),
@@ -576,7 +569,19 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();
     final priceController = TextEditingController();
-    MenuCategory selectedCategory = MenuCategory.mainCourse;
+    int selectedCategoryIndex = _selectedCategoryLabel != null
+        ? _customCategories.indexWhere(
+            (cat) => (cat['label'] as String) == _selectedCategoryLabel,
+          )
+        : (_selectedCategory != null
+            ? _customCategories.indexWhere(
+                (cat) => cat['category'] == _selectedCategory,
+              )
+            : 0);
+
+    if (selectedCategoryIndex < 0) {
+      selectedCategoryIndex = 0;
+    }
 
     showDialog(
       context: context,
@@ -646,8 +651,8 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                   ),
                 ),
                 const SizedBox(height: AppConstants.paddingMedium),
-                DropdownButtonFormField<MenuCategory>(
-                  value: selectedCategory,
+                DropdownButtonFormField<int>(
+                  value: selectedCategoryIndex,
                   dropdownColor: AppConstants.cardBackground,
                   style: AppConstants.bodyMedium,
                   decoration: InputDecoration(
@@ -662,19 +667,20 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                       borderSide: BorderSide.none,
                     ),
                   ),
-                  items: MenuCategory.values.map((category) {
-                    return DropdownMenuItem(
-                      value: category,
+                  items: List.generate(_customCategories.length, (index) {
+                    final category = _customCategories[index];
+                    return DropdownMenuItem<int>(
+                      value: index,
                       child: Text(
-                        category.toString().split('.').last,
+                        category['label'] as String,
                         style: AppConstants.bodyMedium,
                       ),
                     );
-                  }).toList(),
+                  }),
                   onChanged: (value) {
                     if (value != null) {
                       setDialogState(() {
-                        selectedCategory = value;
+                        selectedCategoryIndex = value;
                       });
                     }
                   },
@@ -691,29 +697,39 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
               ),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 if (nameController.text.isNotEmpty &&
                     priceController.text.isNotEmpty) {
-                  setState(() {
-                    _menuItems.add(
-                      MenuItem(
-                        id: 'MENU${_menuItems.length + 1}'.padLeft(7, '0'),
-                        name: nameController.text,
-                        description: descriptionController.text,
-                        price: double.tryParse(priceController.text) ?? 0.0,
-                        category: selectedCategory,
-                        isAvailable: true,
-                        salesCount: 0,
+                  // Generate unique ID
+                  final timestamp = DateTime.now().millisecondsSinceEpoch;
+                  final selectedCategory = _customCategories[selectedCategoryIndex];
+                  final newItem = MenuItem(
+                    id: 'MENU_$timestamp',
+                    name: nameController.text,
+                    description: descriptionController.text,
+                    price: double.tryParse(priceController.text) ?? 0.0,
+                    category: selectedCategory['category'] as MenuCategory,
+                    categoryLabel: selectedCategory['label'] as String,
+                    isAvailable: true,
+                    salesCount: 0,
+                  );
+
+                  Navigator.pop(context);
+                  
+                  final result = await _menuService.createMenuItem(newItem);
+                  
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(result['success'] 
+                          ? '${nameController.text} added successfully' 
+                          : result['error']),
+                        backgroundColor: result['success']
+                          ? AppConstants.successGreen
+                          : AppConstants.errorRed,
                       ),
                     );
-                  });
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${nameController.text} added successfully'),
-                      backgroundColor: AppConstants.successGreen,
-                    ),
-                  );
+                  }
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -732,7 +748,19 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
     final nameController = TextEditingController(text: item.name);
     final descriptionController = TextEditingController(text: item.description);
     final priceController = TextEditingController(text: item.price.toString());
-    MenuCategory selectedCategory = item.category;
+    int selectedCategoryIndex = _customCategories.indexWhere(
+      (cat) => cat['label'] == item.categoryLabel,
+    );
+
+    if (selectedCategoryIndex < 0) {
+      selectedCategoryIndex = _customCategories.indexWhere(
+        (cat) => cat['category'] == item.category,
+      );
+    }
+
+    if (selectedCategoryIndex < 0) {
+      selectedCategoryIndex = 0;
+    }
 
     showDialog(
       context: context,
@@ -802,8 +830,8 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                   ),
                 ),
                 const SizedBox(height: AppConstants.paddingMedium),
-                DropdownButtonFormField<MenuCategory>(
-                  value: selectedCategory,
+                DropdownButtonFormField<int>(
+                  value: selectedCategoryIndex,
                   dropdownColor: AppConstants.cardBackground,
                   style: AppConstants.bodyMedium,
                   decoration: InputDecoration(
@@ -818,19 +846,20 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                       borderSide: BorderSide.none,
                     ),
                   ),
-                  items: MenuCategory.values.map((category) {
-                    return DropdownMenuItem(
-                      value: category,
+                  items: List.generate(_customCategories.length, (index) {
+                    final category = _customCategories[index];
+                    return DropdownMenuItem<int>(
+                      value: index,
                       child: Text(
-                        category.toString().split('.').last,
+                        category['label'] as String,
                         style: AppConstants.bodyMedium,
                       ),
                     );
-                  }).toList(),
+                  }),
                   onChanged: (value) {
                     if (value != null) {
                       setDialogState(() {
-                        selectedCategory = value;
+                        selectedCategoryIndex = value;
                       });
                     }
                   },
@@ -847,28 +876,37 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
               ),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 if (nameController.text.isNotEmpty &&
                     priceController.text.isNotEmpty) {
-                  setState(() {
-                    final index = _menuItems.indexOf(item);
-                    _menuItems[index] = MenuItem(
-                      id: item.id,
-                      name: nameController.text,
-                      description: descriptionController.text,
-                      price: double.tryParse(priceController.text) ?? 0.0,
-                      category: selectedCategory,
-                      isAvailable: item.isAvailable,
-                      salesCount: item.salesCount,
-                    );
-                  });
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${nameController.text} updated successfully'),
-                      backgroundColor: AppConstants.successGreen,
-                    ),
+                  final selectedCategory = _customCategories[selectedCategoryIndex];
+                  final updatedItem = MenuItem(
+                    id: item.id,
+                    name: nameController.text,
+                    description: descriptionController.text,
+                    price: double.tryParse(priceController.text) ?? 0.0,
+                    category: selectedCategory['category'] as MenuCategory,
+                    categoryLabel: selectedCategory['label'] as String,
+                    isAvailable: item.isAvailable,
+                    salesCount: item.salesCount,
                   );
+
+                  Navigator.pop(context);
+                  
+                  final result = await _menuService.updateMenuItem(updatedItem);
+                  
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(result['success']
+                          ? '${nameController.text} updated successfully'
+                          : result['error']),
+                        backgroundColor: result['success']
+                          ? AppConstants.successGreen
+                          : AppConstants.errorRed,
+                      ),
+                    );
+                  }
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -911,17 +949,23 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _menuItems.remove(item);
-              });
+            onPressed: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${item.name} deleted successfully'),
-                  backgroundColor: AppConstants.errorRed,
-                ),
-              );
+              
+              final result = await _menuService.deleteMenuItem(item.id);
+              
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(result['success']
+                      ? '${item.name} deleted successfully'
+                      : result['error']),
+                    backgroundColor: result['success']
+                      ? AppConstants.errorRed
+                      : AppConstants.errorRed,
+                  ),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppConstants.errorRed,
@@ -985,6 +1029,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
   void _showAddCategoryDialog() {
     final nameController = TextEditingController();
     IconData selectedIcon = Icons.restaurant;
+    final messenger = ScaffoldMessenger.of(context);
 
     showDialog(
       context: context,
@@ -1065,23 +1110,40 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
             ),
             ElevatedButton(
               onPressed: () {
-                if (nameController.text.isNotEmpty) {
-                  setState(() {
-                    // Add new category to the list
-                    _customCategories.add({
-                      'label': nameController.text,
-                      'icon': selectedIcon,
-                      'category': MenuCategory.special, // Use 'special' for custom categories
-                    });
-                  });
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
+                final newLabel = nameController.text.trim();
+                if (newLabel.isEmpty) {
+                  return;
+                }
+
+                final alreadyExists = _customCategories.any((cat) =>
+                    (cat['label'] as String).toLowerCase() ==
+                    newLabel.toLowerCase());
+
+                if (alreadyExists) {
+                  messenger.showSnackBar(
                     SnackBar(
-                      content: Text('Category "${nameController.text}" added successfully'),
-                      backgroundColor: AppConstants.successGreen,
+                      content: Text('Category "$newLabel" already exists'),
+                      backgroundColor: AppConstants.errorRed,
                     ),
                   );
+                  return;
                 }
+
+                setState(() {
+                  // Add new category to the list
+                  _customCategories.add({
+                    'label': newLabel,
+                    'icon': selectedIcon,
+                    'category': MenuCategory.special, // Use 'special' for custom categories
+                  });
+                });
+                Navigator.pop(context);
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text('Category "$newLabel" added successfully'),
+                    backgroundColor: AppConstants.successGreen,
+                  ),
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppConstants.primaryOrange,
@@ -1097,6 +1159,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
   /// Show edit category dialog
   void _showEditCategoryDialog(String label, IconData icon, MenuCategory category) {
     final nameController = TextEditingController(text: label);
+    final messenger = ScaffoldMessenger.of(context);
 
     showDialog(
       context: context,
@@ -1131,25 +1194,76 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
-              if (nameController.text.isNotEmpty) {
-                setState(() {
-                  // Find and update the category in the list
-                  final index = _customCategories.indexWhere((cat) => 
-                    cat['label'] == label && cat['category'] == category
-                  );
-                  if (index != -1) {
-                    _customCategories[index]['label'] = nameController.text;
-                  }
-                });
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
+            onPressed: () async {
+              final newLabel = nameController.text.trim();
+              if (newLabel.isEmpty) {
+                return;
+              }
+
+              final duplicate = _customCategories.any((cat) =>
+                  (cat['label'] as String).toLowerCase() ==
+                      newLabel.toLowerCase() &&
+                  cat['category'] == category &&
+                  cat['label'] != label);
+
+              if (duplicate) {
+                messenger.showSnackBar(
                   SnackBar(
-                    content: Text('Category renamed to "${nameController.text}"'),
-                    backgroundColor: AppConstants.successGreen,
+                    content: Text('Category "$newLabel" already exists'),
+                    backgroundColor: AppConstants.errorRed,
                   ),
                 );
+                return;
               }
+
+              final updatedItems = _menuItems
+                  .where((item) =>
+                      item.category == category && item.categoryLabel == label)
+                  .map((item) => item.copyWith(categoryLabel: newLabel))
+                  .toList();
+
+              final Map<String, MenuItem> updatedMap = {
+                for (final item in updatedItems) item.id: item,
+              };
+
+              setState(() {
+                final index = _customCategories.indexWhere((cat) =>
+                    cat['label'] == label && cat['category'] == category);
+                if (index != -1) {
+                  _customCategories[index]['label'] = newLabel;
+                }
+
+                if (updatedMap.isNotEmpty) {
+                  _menuItems = _menuItems
+                      .map((item) => updatedMap[item.id] ?? item)
+                      .toList();
+                }
+
+                if (_selectedCategory == category &&
+                    _selectedCategoryLabel == label) {
+                  _selectedCategoryLabel = newLabel;
+                }
+              });
+
+              Navigator.pop(context);
+
+              for (final updated in updatedItems) {
+                try {
+                  await _menuService.updateMenuItem(updated);
+                } catch (e) {
+                  // Log and continue so UI remains responsive
+                  print('Error updating menu item category label: $e');
+                }
+              }
+
+              if (!mounted) return;
+
+              messenger.showSnackBar(
+                SnackBar(
+                  content: Text('Category renamed to "$newLabel"'),
+                  backgroundColor: AppConstants.successGreen,
+                ),
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppConstants.primaryOrange,
@@ -1248,7 +1362,9 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
 
   /// Show delete category confirmation
   void _showDeleteCategoryConfirmation(String label, MenuCategory category) {
-    final itemsInCategory = _menuItems.where((item) => item.category == category).length;
+    final itemsInCategory = _menuItems
+        .where((item) => item.category == category && item.categoryLabel == label)
+        .length;
 
     showDialog(
       context: context,
@@ -1298,8 +1414,10 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                   cat['label'] == label && cat['category'] == category
                 );
                 // If this was the selected category, reset to "All Items"
-                if (_selectedCategory == category) {
+                if (_selectedCategory == category &&
+                    _selectedCategoryLabel == label) {
                   _selectedCategory = null;
+                  _selectedCategoryLabel = null;
                 }
               });
               Navigator.pop(context);
