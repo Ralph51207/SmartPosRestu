@@ -675,6 +675,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           name: menuItem.name,
           quantity: quantity,
           price: menuItem.price,
+          category: menuItem.category.name,
+          categoryLabel: menuItem.categoryLabel,
         ),
       );
     });

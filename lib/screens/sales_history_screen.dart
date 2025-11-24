@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+
+import '../services/transaction_service.dart';
 import '../utils/constants.dart';
 import '../utils/formatters.dart';
 import 'transaction_history_screen.dart';
+
+enum SalesGrouping { daily, monthly }
 
 class SalesHistoryScreen extends StatefulWidget {
   const SalesHistoryScreen({super.key});
@@ -14,16 +20,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   DateTime? _startDate;
   DateTime? _endDate;
 
-  // Example sales data
-  final List<Map<String, Object>> _allSales = [
-    {'date': DateTime.now(), 'total': 15420.0, 'orders': 45, 'avgOrder': 342.67},
-    {'date': DateTime.now().subtract(const Duration(days: 1)), 'total': 13850.0, 'orders': 38, 'avgOrder': 364.47},
-    {'date': DateTime.now().subtract(const Duration(days: 2)), 'total': 16200.0, 'orders': 52, 'avgOrder': 311.54},
-    {'date': DateTime.now().subtract(const Duration(days: 3)), 'total': 14670.0, 'orders': 41, 'avgOrder': 357.80},
-    {'date': DateTime.now().subtract(const Duration(days: 4)), 'total': 17350.0, 'orders': 55, 'avgOrder': 315.45},
-    {'date': DateTime.now().subtract(const Duration(days: 5)), 'total': 12890.0, 'orders': 36, 'avgOrder': 358.06},
-    {'date': DateTime.now().subtract(const Duration(days: 6)), 'total': 18920.0, 'orders': 61, 'avgOrder': 310.16},
-  ];
+  SalesGrouping _grouping = SalesGrouping.daily;
 
   // Expenses data
   final List<Map<String, dynamic>> _allExpenses = [
@@ -62,13 +59,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     return !date.isBefore(_startDate!) && !date.isAfter(_endDate!);
   }
 
-  List<Map<String, Object>> get _filteredSales {
-    return _allSales.where((s) {
-      final date = s['date'] as DateTime;
-      return _isDateInRange(date);
-    }).toList();
-  }
-
   List<Map<String, dynamic>> get _filteredExpenses {
     return _allExpenses.where((e) {
       final date = e['date'] as DateTime;
@@ -76,21 +66,12 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     }).toList();
   }
 
-  double get _totalSales =>
-      _filteredSales.fold(0.0, (s, sale) => s + (sale['total'] as double));
-
-  double get _totalExpenses =>
-      _filteredExpenses.fold(0.0, (s, expense) => s + (expense['amount'] as double));
-
-  double get _grossProfit => _totalSales;
-
-  double get _netProfit => _totalSales - _totalExpenses;
-
-  int get _totalOrders =>
-      _filteredSales.fold(0, (s, sale) => s + (sale['orders'] as int));
-
-  double get _avgOrderValue =>
-      _totalOrders > 0 ? _totalSales / _totalOrders : 0.0;
+  double _asDouble(dynamic value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+    return double.tryParse(value?.toString() ?? '0') ?? 0;
+  }
 
   Future<void> _pickDateRange() async {
     final picked = await showDateRangePicker(
@@ -193,7 +174,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       'Maintenance',
       'Marketing',
       'Transportation',
-      'Other'
+      'Other',
     ];
 
     showDialog(
@@ -216,12 +197,20 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     filled: true,
                     fillColor: AppConstants.cardBackground,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
-                      borderSide: const BorderSide(color: AppConstants.dividerColor),
+                      borderRadius: BorderRadius.circular(
+                        AppConstants.radiusSmall,
+                      ),
+                      borderSide: const BorderSide(
+                        color: AppConstants.dividerColor,
+                      ),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
-                      borderSide: const BorderSide(color: AppConstants.dividerColor),
+                      borderRadius: BorderRadius.circular(
+                        AppConstants.radiusSmall,
+                      ),
+                      borderSide: const BorderSide(
+                        color: AppConstants.dividerColor,
+                      ),
                     ),
                   ),
                   dropdownColor: AppConstants.cardBackground,
@@ -253,12 +242,20 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     filled: true,
                     fillColor: AppConstants.cardBackground,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
-                      borderSide: const BorderSide(color: AppConstants.dividerColor),
+                      borderRadius: BorderRadius.circular(
+                        AppConstants.radiusSmall,
+                      ),
+                      borderSide: const BorderSide(
+                        color: AppConstants.dividerColor,
+                      ),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
-                      borderSide: const BorderSide(color: AppConstants.dividerColor),
+                      borderRadius: BorderRadius.circular(
+                        AppConstants.radiusSmall,
+                      ),
+                      borderSide: const BorderSide(
+                        color: AppConstants.dividerColor,
+                      ),
                     ),
                   ),
                 ),
@@ -280,12 +277,20 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     filled: true,
                     fillColor: AppConstants.cardBackground,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
-                      borderSide: const BorderSide(color: AppConstants.dividerColor),
+                      borderRadius: BorderRadius.circular(
+                        AppConstants.radiusSmall,
+                      ),
+                      borderSide: const BorderSide(
+                        color: AppConstants.dividerColor,
+                      ),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
-                      borderSide: const BorderSide(color: AppConstants.dividerColor),
+                      borderRadius: BorderRadius.circular(
+                        AppConstants.radiusSmall,
+                      ),
+                      borderSide: const BorderSide(
+                        color: AppConstants.dividerColor,
+                      ),
                     ),
                   ),
                 ),
@@ -323,7 +328,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: AppConstants.cardBackground,
-                      borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+                      borderRadius: BorderRadius.circular(
+                        AppConstants.radiusSmall,
+                      ),
                       border: Border.all(color: AppConstants.dividerColor),
                     ),
                     child: Row(
@@ -357,7 +364,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             ),
             ElevatedButton(
               onPressed: () {
-                if (descriptionController.text.isEmpty || amountController.text.isEmpty) {
+                if (descriptionController.text.isEmpty ||
+                    amountController.text.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Please fill in all fields'),
@@ -409,6 +417,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   }
 
   void _showExpensesDialog() {
+    final expenses = _filteredExpenses;
+    final totalExpenses = expenses.fold(
+      0.0,
+      (sum, expense) => sum + _asDouble(expense['amount']),
+    );
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -432,24 +445,23 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               ),
               const Divider(color: AppConstants.dividerColor),
               const SizedBox(height: AppConstants.paddingSmall),
-              
+
               // Total Expenses Summary
               Container(
                 padding: const EdgeInsets.all(AppConstants.paddingMedium),
                 decoration: BoxDecoration(
                   color: AppConstants.errorRed.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+                  borderRadius: BorderRadius.circular(
+                    AppConstants.radiusMedium,
+                  ),
                   border: Border.all(color: AppConstants.errorRed),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Total Expenses',
-                      style: AppConstants.bodyLarge,
-                    ),
+                    const Text('Total Expenses', style: AppConstants.bodyLarge),
                     Text(
-                      Formatters.formatCurrency(_totalExpenses),
+                      Formatters.formatCurrency(totalExpenses),
                       style: AppConstants.headingSmall.copyWith(
                         color: AppConstants.errorRed,
                         fontWeight: FontWeight.bold,
@@ -462,7 +474,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
 
               // Expenses List
               Expanded(
-                child: _filteredExpenses.isEmpty
+                child: expenses.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -470,7 +482,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                             Icon(
                               Icons.receipt_outlined,
                               size: 64,
-                              color: AppConstants.textSecondary.withOpacity(0.5),
+                              color: AppConstants.textSecondary.withOpacity(
+                                0.5,
+                              ),
                             ),
                             const SizedBox(height: AppConstants.paddingMedium),
                             Text(
@@ -483,50 +497,68 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                         ),
                       )
                     : ListView.separated(
-                        itemCount: _filteredExpenses.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: AppConstants.paddingSmall),
+                        itemCount: expenses.length,
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: AppConstants.paddingSmall),
                         itemBuilder: (context, index) {
-                          final expense = _filteredExpenses[index];
+                          final expense = expenses[index];
                           return Container(
-                            padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                            padding: const EdgeInsets.all(
+                              AppConstants.paddingMedium,
+                            ),
                             decoration: BoxDecoration(
                               color: AppConstants.cardBackground,
-                              borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
-                              border: Border.all(color: AppConstants.dividerColor),
+                              borderRadius: BorderRadius.circular(
+                                AppConstants.radiusMedium,
+                              ),
+                              border: Border.all(
+                                color: AppConstants.dividerColor,
+                              ),
                             ),
                             child: Row(
                               children: [
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: AppConstants.errorRed.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+                                    color: AppConstants.errorRed.withOpacity(
+                                      0.1,
+                                    ),
+                                    borderRadius: BorderRadius.circular(
+                                      AppConstants.radiusSmall,
+                                    ),
                                   ),
                                   child: const Icon(
                                     Icons.money_off,
                                     color: AppConstants.errorRed,
                                   ),
                                 ),
-                                const SizedBox(width: AppConstants.paddingMedium),
+                                const SizedBox(
+                                  width: AppConstants.paddingMedium,
+                                ),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
                                           Text(
                                             expense['category'],
-                                            style: AppConstants.bodySmall.copyWith(
-                                              color: AppConstants.primaryOrange,
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                            style: AppConstants.bodySmall
+                                                .copyWith(
+                                                  color: AppConstants
+                                                      .primaryOrange,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
                                           ),
                                           const SizedBox(width: 8),
                                           Text(
                                             '• ${Formatters.formatDate(expense['date'])}',
-                                            style: AppConstants.bodySmall.copyWith(
-                                              color: AppConstants.textSecondary,
-                                            ),
+                                            style: AppConstants.bodySmall
+                                                .copyWith(
+                                                  color: AppConstants
+                                                      .textSecondary,
+                                                ),
                                           ),
                                         ],
                                       ),
@@ -539,14 +571,19 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                                   ),
                                 ),
                                 Text(
-                                  Formatters.formatCurrency(expense['amount']),
+                                  Formatters.formatCurrency(
+                                    _asDouble(expense['amount']),
+                                  ),
                                   style: AppConstants.bodyLarge.copyWith(
                                     color: AppConstants.errorRed,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.delete_outline, size: 20),
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    size: 20,
+                                  ),
                                   color: AppConstants.errorRed,
                                   onPressed: () {
                                     setState(() {
@@ -571,7 +608,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final sales = _filteredSales;
+    final transactionService = Provider.of<TransactionService>(
+      context,
+      listen: false,
+    );
 
     return Scaffold(
       backgroundColor: AppConstants.darkBackground,
@@ -602,339 +642,211 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           ),
         ],
       ),
-      body: Column(
+      body: StreamBuilder<List<TransactionRecord>>(
+        stream: transactionService.watchTransactions(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return _buildErrorState(
+              snapshot.error?.toString() ?? 'Failed to load sales data',
+            );
+          }
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(
+                color: AppConstants.primaryOrange,
+              ),
+            );
+          }
+
+          final transactions = _filterTransactions(
+            snapshot.data ?? const <TransactionRecord>[],
+          );
+          final summaries = _buildSummaries(transactions);
+          final totalSales = _calculateSalesTotal(transactions);
+          final totalOrders = transactions.length;
+          final avgOrderValue = totalOrders == 0 ? 0.0 : totalSales / totalOrders;
+          final expenses = _filteredExpenses;
+          final totalExpenses = expenses.fold(
+            0.0,
+            (sum, expense) => sum + _asDouble(expense['amount']),
+          );
+          final netProfit = totalSales - totalExpenses;
+
+          return Column(
+            children: [
+              _buildDateSelectorSection(),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _buildProfitCards(
+                        totalSales,
+                        totalExpenses,
+                        netProfit,
+                        expenses.length,
+                      ),
+                      _buildSalesTable(summaries),
+                      const SizedBox(height: AppConstants.paddingMedium),
+                    ],
+                  ),
+                ),
+              ),
+              _buildFooter(totalSales, totalOrders, avgOrderValue),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDateSelectorSection() {
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      color: AppConstants.cardBackground,
+      child: Column(
         children: [
-          // Date selector (Fixed at top)
-          Container(
-            padding: const EdgeInsets.all(AppConstants.paddingMedium),
-            color: AppConstants.cardBackground,
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.date_range,
-                      color: AppConstants.primaryOrange,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _dateRangeText,
-                        style: AppConstants.bodyMedium.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    if (_startDate != null)
-                      IconButton(
-                        onPressed: _clearDates,
-                        icon: const Icon(Icons.clear),
-                        color: AppConstants.textSecondary,
-                        iconSize: 20,
-                      ),
-                  ],
+          Row(
+            children: [
+              const Icon(
+                Icons.date_range,
+                color: AppConstants.primaryOrange,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _dateRangeText,
+                  style: AppConstants.bodyMedium.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _pickSingleDate,
-                        icon: const Icon(Icons.calendar_today, size: 16),
-                        label: const Text('Single Date'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppConstants.primaryOrange,
-                          side: const BorderSide(color: AppConstants.primaryOrange),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _pickDateRange,
-                        icon: const Icon(Icons.date_range, size: 16),
-                        label: const Text('Date Range'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppConstants.primaryOrange,
-                          side: const BorderSide(color: AppConstants.primaryOrange),
-                        ),
-                      ),
-                    ),
-                  ],
+              ),
+              if (_startDate != null)
+                IconButton(
+                  onPressed: _clearDates,
+                  icon: const Icon(Icons.clear),
+                  color: AppConstants.textSecondary,
+                  iconSize: 20,
                 ),
-              ],
-            ),
+            ],
           ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _pickSingleDate,
+                  icon: const Icon(Icons.calendar_today, size: 16),
+                  label: const Text('Single Date'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppConstants.primaryOrange,
+                    side: const BorderSide(color: AppConstants.primaryOrange),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _pickDateRange,
+                  icon: const Icon(Icons.date_range, size: 16),
+                  label: const Text('Date Range'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppConstants.primaryOrange,
+                    side: const BorderSide(color: AppConstants.primaryOrange),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _buildGroupingToggle(),
+        ],
+      ),
+    );
+  }
 
-          // Scrollable content area
+  Widget _buildGroupingToggle() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        ChoiceChip(
+          label: const Text('Daily'),
+          selected: _grouping == SalesGrouping.daily,
+          onSelected: (selected) {
+            if (selected) {
+              setState(() => _grouping = SalesGrouping.daily);
+            }
+          },
+          selectedColor: AppConstants.primaryOrange,
+          backgroundColor: AppConstants.darkSecondary,
+          labelStyle: TextStyle(
+            color: _grouping == SalesGrouping.daily
+                ? Colors.white
+                : AppConstants.textSecondary,
+          ),
+        ),
+        const SizedBox(width: 12),
+        ChoiceChip(
+          label: const Text('Monthly'),
+          selected: _grouping == SalesGrouping.monthly,
+          onSelected: (selected) {
+            if (selected) {
+              setState(() => _grouping = SalesGrouping.monthly);
+            }
+          },
+          selectedColor: AppConstants.primaryOrange,
+          backgroundColor: AppConstants.darkSecondary,
+          labelStyle: TextStyle(
+            color: _grouping == SalesGrouping.monthly
+                ? Colors.white
+                : AppConstants.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProfitCards(
+    double grossProfit,
+    double totalExpenses,
+    double netProfit,
+    int expenseCount,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      child: Row(
+        children: [
           Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  // Profit Summary Cards
-                  Container(
-                    padding: const EdgeInsets.all(AppConstants.paddingMedium),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _buildProfitCard(
-                            'Gross Profit',
-                            _grossProfit,
-                            AppConstants.successGreen,
-                            Icons.trending_up,
-                          ),
-                        ),
-                        const SizedBox(width: AppConstants.paddingMedium),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: _showExpensesDialog,
-                            child: _buildProfitCard(
-                              'Expenses',
-                              _totalExpenses,
-                              AppConstants.errorRed,
-                              Icons.money_off,
-                              showBadge: true,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: AppConstants.paddingMedium),
-                        Expanded(
-                          child: _buildProfitCard(
-                            'Net Profit',
-                            _netProfit,
-                            _netProfit >= 0 ? AppConstants.primaryOrange : AppConstants.errorRed,
-                            Icons.account_balance_wallet,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Excel-like Table
-                  // Table Header
-                  Container(
-                    margin: const EdgeInsets.all(AppConstants.paddingMedium),
-                    decoration: BoxDecoration(
-                      color: AppConstants.darkSecondary,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(AppConstants.radiusMedium),
-                        topRight: Radius.circular(AppConstants.radiusMedium),
-                      ),
-                      border: Border.all(color: AppConstants.dividerColor),
-                    ),
-                    child: Table(
-                      columnWidths: const {
-                        0: FlexColumnWidth(2),
-                        1: FlexColumnWidth(2),
-                        2: FlexColumnWidth(1.5),
-                        3: FlexColumnWidth(2),
-                      },
-                      children: [
-                        TableRow(
-                          decoration: BoxDecoration(
-                            color: AppConstants.primaryOrange.withOpacity(0.1),
-                            borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(AppConstants.radiusMedium),
-                              topRight: Radius.circular(AppConstants.radiusMedium),
-                            ),
-                          ),
-                          children: [
-                            _buildHeaderCell('Date'),
-                            _buildHeaderCell('Total Sales'),
-                            _buildHeaderCell('Orders'),
-                            _buildHeaderCell('Avg Order'),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Table Body
-                  if (sales.isEmpty)
-                    Container(
-                      padding: const EdgeInsets.all(AppConstants.paddingLarge * 2),
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.table_chart_outlined,
-                            size: 64,
-                            color: AppConstants.textSecondary.withOpacity(0.5),
-                          ),
-                          const SizedBox(height: AppConstants.paddingMedium),
-                          Text(
-                            'No sales data found',
-                            style: AppConstants.bodyMedium.copyWith(
-                              color: AppConstants.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  else
-                    Container(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: AppConstants.paddingMedium,
-                      ),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppConstants.dividerColor),
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(AppConstants.radiusMedium),
-                          bottomRight: Radius.circular(AppConstants.radiusMedium),
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          ...List.generate(sales.length, (index) {
-                            final sale = sales[index];
-                            final date = sale['date'] as DateTime;
-                            final isLast = index == sales.length - 1;
-
-                            return Container(
-                              decoration: BoxDecoration(
-                                color: index % 2 == 0
-                                    ? AppConstants.cardBackground
-                                    : AppConstants.darkBackground,
-                                border: !isLast
-                                    ? const Border(
-                                        bottom: BorderSide(
-                                          color: AppConstants.dividerColor,
-                                          width: 0.5,
-                                        ),
-                                      )
-                                    : null,
-                              ),
-                              child: Table(
-                                columnWidths: const {
-                                  0: FlexColumnWidth(2),
-                                  1: FlexColumnWidth(2),
-                                  2: FlexColumnWidth(1.5),
-                                  3: FlexColumnWidth(2),
-                                },
-                                children: [
-                                  TableRow(
-                                    children: [
-                                      _buildDataCell(
-                                        Formatters.formatDate(date),
-                                        isLast,
-                                      ),
-                                      _buildDataCell(
-                                        Formatters.formatCurrency(sale['total'] as double),
-                                        isLast,
-                                        color: AppConstants.successGreen,
-                                        bold: true,
-                                      ),
-                                      _buildDataCell(
-                                        sale['orders'].toString(),
-                                        isLast,
-                                        centered: true,
-                                      ),
-                                      _buildDataCell(
-                                        Formatters.formatCurrency(sale['avgOrder'] as double),
-                                        isLast,
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
-
-                  const SizedBox(height: AppConstants.paddingMedium),
-                ],
+            child: _buildProfitCard(
+              'Gross Profit',
+              grossProfit,
+              AppConstants.successGreen,
+              Icons.trending_up,
+            ),
+          ),
+          const SizedBox(width: AppConstants.paddingMedium),
+          Expanded(
+            child: GestureDetector(
+              onTap: _showExpensesDialog,
+              child: _buildProfitCard(
+                'Expenses',
+                totalExpenses,
+                AppConstants.errorRed,
+                Icons.money_off,
+                showBadge: true,
+                badgeValue: expenseCount,
               ),
             ),
           ),
-
-          // Summary Footer with Print Button (Fixed at bottom)
-          Container(
-            padding: const EdgeInsets.all(AppConstants.paddingMedium),
-            decoration: BoxDecoration(
-              color: AppConstants.darkSecondary,
-              border: const Border(
-                top: BorderSide(color: AppConstants.dividerColor, width: 2),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildSummaryItem(
-                      'Total Sales',
-                      Formatters.formatCurrency(_totalSales),
-                      AppConstants.successGreen,
-                    ),
-                    Container(
-                      width: 1,
-                      height: 40,
-                      color: AppConstants.dividerColor,
-                    ),
-                    _buildSummaryItem(
-                      'Total Orders',
-                      _totalOrders.toString(),
-                      AppConstants.primaryOrange,
-                    ),
-                    Container(
-                      width: 1,
-                      height: 40,
-                      color: AppConstants.dividerColor,
-                    ),
-                    _buildSummaryItem(
-                      'Avg Order',
-                      Formatters.formatCurrency(_avgOrderValue),
-                      Colors.blue,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppConstants.paddingMedium),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _showAddExpenseDialog,
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add Expense'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppConstants.errorRed,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: AppConstants.paddingSmall),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton.icon(
-                        onPressed: _printReport,
-                        icon: const Icon(Icons.print),
-                        label: const Text('Print Report'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppConstants.primaryOrange,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+          const SizedBox(width: AppConstants.paddingMedium),
+          Expanded(
+            child: _buildProfitCard(
+              'Net Profit',
+              netProfit,
+              netProfit >= 0
+                  ? AppConstants.primaryOrange
+                  : AppConstants.errorRed,
+              Icons.account_balance_wallet,
             ),
           ),
         ],
@@ -942,7 +854,308 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     );
   }
 
-  Widget _buildProfitCard(String label, double value, Color color, IconData icon, {bool showBadge = false}) {
+  Widget _buildSalesTable(List<_SalesSummary> summaries) {
+    final hasData = summaries.isNotEmpty;
+    return Column(
+      children: [
+        Container(
+          margin: const EdgeInsets.all(AppConstants.paddingMedium),
+          decoration: BoxDecoration(
+            color: AppConstants.darkSecondary,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(AppConstants.radiusMedium),
+              topRight: Radius.circular(AppConstants.radiusMedium),
+            ),
+            border: Border.all(color: AppConstants.dividerColor),
+          ),
+          child: Table(
+            columnWidths: const {
+              0: FlexColumnWidth(2),
+              1: FlexColumnWidth(2),
+              2: FlexColumnWidth(1.5),
+              3: FlexColumnWidth(2),
+            },
+            children: [
+              TableRow(
+                decoration: BoxDecoration(
+                  color: AppConstants.primaryOrange.withOpacity(0.1),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(AppConstants.radiusMedium),
+                    topRight: Radius.circular(AppConstants.radiusMedium),
+                  ),
+                ),
+                children: [
+                  _buildHeaderCell(
+                    _grouping == SalesGrouping.daily ? 'Date' : 'Month',
+                  ),
+                  _buildHeaderCell('Total Sales'),
+                  _buildHeaderCell('Orders'),
+                  _buildHeaderCell('Avg Order'),
+                ],
+              ),
+            ],
+          ),
+        ),
+        if (!hasData)
+          Container(
+            padding: const EdgeInsets.all(AppConstants.paddingLarge * 2),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.table_chart_outlined,
+                  size: 64,
+                  color: AppConstants.textSecondary.withOpacity(0.5),
+                ),
+                const SizedBox(height: AppConstants.paddingMedium),
+                Text(
+                  'No sales data found',
+                  style: AppConstants.bodyMedium.copyWith(
+                    color: AppConstants.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          Container(
+            margin: const EdgeInsets.symmetric(
+              horizontal: AppConstants.paddingMedium,
+            ),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppConstants.dividerColor),
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(AppConstants.radiusMedium),
+                bottomRight: Radius.circular(AppConstants.radiusMedium),
+              ),
+            ),
+            child: Column(
+              children: [
+                for (var i = 0; i < summaries.length; i++)
+                  _buildSalesRow(
+                    summaries[i],
+                    isLast: i == summaries.length - 1,
+                    isAlternate: i.isEven,
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSalesRow(
+    _SalesSummary summary, {
+    required bool isLast,
+    required bool isAlternate,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isAlternate
+            ? AppConstants.cardBackground
+            : AppConstants.darkBackground,
+        border: !isLast
+            ? const Border(
+                bottom: BorderSide(
+                  color: AppConstants.dividerColor,
+                  width: 0.5,
+                ),
+              )
+            : null,
+      ),
+      child: Table(
+        columnWidths: const {
+          0: FlexColumnWidth(2),
+          1: FlexColumnWidth(2),
+          2: FlexColumnWidth(1.5),
+          3: FlexColumnWidth(2),
+        },
+        children: [
+          TableRow(
+            children: [
+              _buildDataCell(_formatSummaryDate(summary.date), isLast),
+              _buildDataCell(
+                Formatters.formatCurrency(summary.total),
+                isLast,
+                color: AppConstants.successGreen,
+                bold: true,
+              ),
+              _buildDataCell(summary.orders.toString(), isLast, centered: true),
+              _buildDataCell(
+                Formatters.formatCurrency(summary.avgOrder),
+                isLast,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFooter(
+    double totalSales,
+    int totalOrders,
+    double avgOrderValue,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      decoration: BoxDecoration(
+        color: AppConstants.darkSecondary,
+        border: const Border(
+          top: BorderSide(color: AppConstants.dividerColor, width: 2),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildSummaryItem(
+                'Total Sales',
+                Formatters.formatCurrency(totalSales),
+                AppConstants.successGreen,
+              ),
+              Container(width: 1, height: 40, color: AppConstants.dividerColor),
+              _buildSummaryItem(
+                'Total Orders',
+                totalOrders.toString(),
+                AppConstants.primaryOrange,
+              ),
+              Container(width: 1, height: 40, color: AppConstants.dividerColor),
+              _buildSummaryItem(
+                'Avg Order',
+                Formatters.formatCurrency(avgOrderValue),
+                Colors.blue,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppConstants.paddingMedium),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _showAddExpenseDialog,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Expense'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppConstants.errorRed,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        AppConstants.radiusMedium,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppConstants.paddingSmall),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  onPressed: _printReport,
+                  icon: const Icon(Icons.print),
+                  label: const Text('Print Report'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppConstants.primaryOrange,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        AppConstants.radiusMedium,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState(String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppConstants.paddingLarge),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, color: AppConstants.errorRed, size: 48),
+            const SizedBox(height: AppConstants.paddingSmall),
+            Text(
+              'Unable to load sales',
+              style: AppConstants.headingSmall.copyWith(
+                color: AppConstants.errorRed,
+              ),
+            ),
+            const SizedBox(height: AppConstants.paddingSmall),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: AppConstants.bodySmall.copyWith(
+                color: AppConstants.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<TransactionRecord> _filterTransactions(
+    List<TransactionRecord> transactions,
+  ) {
+    return transactions
+        .where((record) => _isDateInRange(record.timestamp))
+        .toList();
+  }
+
+  List<_SalesSummary> _buildSummaries(List<TransactionRecord> transactions) {
+    final Map<String, _SalesSummary> grouped = {};
+    for (final transaction in transactions) {
+      final timestamp = transaction.timestamp;
+      final keyDate = _grouping == SalesGrouping.daily
+          ? DateTime(timestamp.year, timestamp.month, timestamp.day)
+          : DateTime(timestamp.year, timestamp.month);
+      final key = keyDate.toIso8601String();
+      final summary = grouped.putIfAbsent(
+        key,
+        () => _SalesSummary(date: keyDate),
+      );
+      summary.addTransaction(transaction);
+    }
+    final summaries = grouped.values.toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+    return summaries;
+  }
+
+  double _calculateSalesTotal(List<TransactionRecord> transactions) {
+    return transactions.fold(0.0, (sum, record) => sum + record.saleAmount);
+  }
+
+  String _formatSummaryDate(DateTime date) {
+    if (_grouping == SalesGrouping.daily) {
+      return Formatters.formatDate(date);
+    }
+    return DateFormat('MMMM yyyy').format(date);
+  }
+
+  Widget _buildProfitCard(
+    String label,
+    double value,
+    Color color,
+    IconData icon, {
+    bool showBadge = false,
+    int badgeValue = 0,
+  }) {
     return Container(
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       decoration: BoxDecoration(
@@ -985,7 +1198,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   shape: BoxShape.circle,
                 ),
                 child: Text(
-                  '${_filteredExpenses.length}',
+                  '$badgeValue',
                   style: AppConstants.bodySmall.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -1060,5 +1273,21 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         ),
       ],
     );
+  }
+}
+
+/// Aggregated sales data for a specific day or month.
+class _SalesSummary {
+  _SalesSummary({required this.date});
+
+  final DateTime date;
+  double total = 0;
+  int orders = 0;
+
+  double get avgOrder => orders == 0 ? 0 : total / orders;
+
+  void addTransaction(TransactionRecord record) {
+    total += record.saleAmount;
+    orders += 1;
   }
 }

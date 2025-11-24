@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/order_model.dart';
 import '../utils/constants.dart';
 import '../utils/formatters.dart';
 import '../widgets/order_card.dart';
 import '../services/order_service.dart';
 import '../services/table_service.dart';
+import '../services/transaction_service.dart';
 import 'new_order_screen.dart';
 
 /// Order Management screen - View and manage customer orders
@@ -80,12 +82,37 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
       if (_shouldReleaseTable(order, newStatus)) {
         tableError = await _clearTableForOrder(order);
       }
+      if (newStatus == OrderStatus.completed && mounted) {
+        final transactionService = Provider.of<TransactionService>(
+          context,
+          listen: false,
+        );
+        final result = await transactionService.saveCheckout(
+          order: order,
+          paymentMethod: 'Manual Status Update',
+          amountPaid: order.totalAmount,
+          change: 0,
+          metadata: const {'source': 'status_update'},
+        );
+        if (!result['success'] && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                result['message'] ?? 'Failed to record transaction',
+              ),
+              backgroundColor: AppConstants.errorRed,
+            ),
+          );
+        }
+      }
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Order ${order.id} updated to ${newStatus.toString().split('.').last}'),
+          content: Text(
+            'Order ${order.id} updated to ${newStatus.toString().split('.').last}',
+          ),
           backgroundColor: AppConstants.successGreen,
         ),
       );
@@ -125,7 +152,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
         leading: IconButton(
           icon: const Icon(Icons.menu),
           onPressed: () {
-            final scaffoldState = context.findAncestorStateOfType<ScaffoldState>();
+            final scaffoldState = context
+                .findAncestorStateOfType<ScaffoldState>();
             if (scaffoldState != null) {
               scaffoldState.openDrawer();
             }
@@ -133,15 +161,9 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
         ),
         title: Row(
           children: [
-            Icon(
-              Icons.receipt_long,
-              color: AppConstants.primaryOrange,
-            ),
+            Icon(Icons.receipt_long, color: AppConstants.primaryOrange),
             const SizedBox(width: AppConstants.paddingSmall),
-            const Text(
-              'Orders',
-              style: AppConstants.headingMedium,
-            ),
+            const Text('Orders', style: AppConstants.headingMedium),
           ],
         ),
         actions: [
@@ -163,9 +185,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
           _buildStatusTabs(),
 
           // Orders list
-          Expanded(
-            child: _buildOrdersList(),
-          ),
+          Expanded(child: _buildOrdersList()),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -186,7 +206,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(
-            horizontal: AppConstants.paddingMedium),
+          horizontal: AppConstants.paddingMedium,
+        ),
         children: [
           // "All" filter option
           Padding(
@@ -198,8 +219,9 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                   color: _selectedFilter == null
                       ? Colors.white
                       : AppConstants.textSecondary,
-                  fontWeight:
-                      _selectedFilter == null ? FontWeight.bold : FontWeight.normal,
+                  fontWeight: _selectedFilter == null
+                      ? FontWeight.bold
+                      : FontWeight.normal,
                 ),
               ),
               selected: _selectedFilter == null,
@@ -225,8 +247,9 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                     color: isSelected
                         ? Colors.white
                         : AppConstants.textSecondary,
-                    fontWeight:
-                        isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                   ),
                 ),
                 selected: isSelected,
@@ -268,11 +291,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.error_outline,
-                size: 64,
-                color: AppConstants.errorRed,
-              ),
+              Icon(Icons.error_outline, size: 64, color: AppConstants.errorRed),
               const SizedBox(height: AppConstants.paddingMedium),
               Text(
                 'Failed to load orders',
@@ -346,10 +365,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
           children: [
             // "All" option
             RadioListTile<OrderStatus?>(
-              title: const Text(
-                'ALL',
-                style: AppConstants.bodyMedium,
-              ),
+              title: const Text('ALL', style: AppConstants.bodyMedium),
               value: null,
               groupValue: _selectedFilter,
               activeColor: AppConstants.primaryOrange,
@@ -404,10 +420,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Order #${order.id}',
-                  style: AppConstants.headingMedium,
-                ),
+                Text('Order #${order.id}', style: AppConstants.headingMedium),
                 IconButton(
                   icon: const Icon(Icons.close),
                   onPressed: () => Navigator.pop(context),
@@ -415,7 +428,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
               ],
             ),
             const SizedBox(height: AppConstants.paddingMedium),
-            
+
             // Order Info
             Container(
               padding: const EdgeInsets.all(AppConstants.paddingMedium),
@@ -480,11 +493,11 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: AppConstants.paddingMedium),
             const Text('Items:', style: AppConstants.headingSmall),
             const SizedBox(height: AppConstants.paddingSmall),
-            
+
             // Items List
             Container(
               constraints: const BoxConstraints(maxHeight: 200),
@@ -494,11 +507,15 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                 itemBuilder: (context, index) {
                   final item = order.items[index];
                   return Container(
-                    margin: const EdgeInsets.only(bottom: AppConstants.paddingSmall),
+                    margin: const EdgeInsets.only(
+                      bottom: AppConstants.paddingSmall,
+                    ),
                     padding: const EdgeInsets.all(AppConstants.paddingSmall),
                     decoration: BoxDecoration(
                       color: AppConstants.darkSecondary,
-                      borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+                      borderRadius: BorderRadius.circular(
+                        AppConstants.radiusSmall,
+                      ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -521,10 +538,10 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                 },
               ),
             ),
-            
+
             const SizedBox(height: AppConstants.paddingMedium),
             const Divider(color: AppConstants.dividerColor),
-            
+
             // Total
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -539,9 +556,9 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                 ),
               ],
             ),
-            
+
             const SizedBox(height: AppConstants.paddingLarge),
-            
+
             // Action Buttons
             Row(
               children: [
@@ -557,18 +574,22 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                       label: const Text('Update Status'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppConstants.primaryOrange,
-                        side: const BorderSide(color: AppConstants.primaryOrange),
+                        side: const BorderSide(
+                          color: AppConstants.primaryOrange,
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+                          borderRadius: BorderRadius.circular(
+                            AppConstants.radiusMedium,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                
+
                 if (order.status != OrderStatus.completed)
                   const SizedBox(width: AppConstants.paddingSmall),
-                
+
                 // Checkout Button
                 Expanded(
                   flex: order.status != OrderStatus.completed ? 1 : 1,
@@ -587,7 +608,9 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                       disabledBackgroundColor: AppConstants.textSecondary,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+                        borderRadius: BorderRadius.circular(
+                          AppConstants.radiusMedium,
+                        ),
                       ),
                     ),
                   ),
@@ -629,7 +652,10 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppConstants.cardBackground,
-        title: const Text('Update Order Status', style: AppConstants.headingSmall),
+        title: const Text(
+          'Update Order Status',
+          style: AppConstants.headingSmall,
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: OrderStatus.values.map((status) {
@@ -658,21 +684,17 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
   /// Show checkout dialog with amount paid and change calculation
   void _showCheckoutDialog(Order order) {
     String selectedPaymentMethod = 'Cash';
-    final paymentMethods = ['Cash', 'Credit Card', 'Debit Card', 'GCash', 'PayMaya'];
-    final amountPaidController = TextEditingController();
-    double amountPaid = 0.0;
-    double change = 0.0;
-    
-    // Preset amount buttons - FIX: Convert to double explicitly
-    final presetAmounts = [
-      order.totalAmount, // Exact amount
-      ((order.totalAmount / 100).ceil() * 100).toDouble(), // Round up to nearest 100
-      (((order.totalAmount / 100).ceil() * 100) + 100).toDouble(), // +100
-      ((order.totalAmount / 500).ceil() * 500).toDouble(), // Round up to nearest 500
-      1000.0,
-      500.0,
+    double amountPaid = 0;
+    double change = 0;
+
+    final List<String> paymentMethods = [
+      'Cash',
+      'Credit Card',
+      'Debit Card',
+      'GCash',
+      'PayMaya',
     ];
-    
+
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -682,265 +704,230 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
             children: [
               const Icon(Icons.payment, color: AppConstants.primaryOrange),
               const SizedBox(width: 8),
-              const Text('Checkout', style: AppConstants.headingSmall),
+              const Text('Checkout', style: AppConstants.headingMedium),
             ],
           ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Order Summary
-                Container(
-                  padding: const EdgeInsets.all(AppConstants.paddingMedium),
-                  decoration: BoxDecoration(
-                    color: AppConstants.darkSecondary,
-                    borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Order #${order.id}', style: AppConstants.bodyLarge),
-                          Text(_formatTableLabel(order.tableNumber),
-                              style: AppConstants.bodyLarge),
-                        ],
+          content: SizedBox(
+            width: 500, // ADD THIS - Fixed width
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Order Summary
+                  Container(
+                    padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                    decoration: BoxDecoration(
+                      color: AppConstants.darkSecondary,
+                      borderRadius: BorderRadius.circular(
+                        AppConstants.radiusSmall,
                       ),
-                      const SizedBox(height: 8),
-                      const Divider(color: AppConstants.dividerColor),
-                      const SizedBox(height: 8),
-                      ...order.items.map((item) => Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  '${item.quantity}x ${item.name}',
-                                  style: AppConstants.bodySmall,
-                                ),
-                                Text(
-                                  Formatters.formatCurrency(item.totalPrice),
-                                  style: AppConstants.bodySmall,
-                                ),
-                              ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Order #${order.id}',
+                          style: AppConstants.bodyLarge.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Table ${order.tableNumber}',
+                          style: AppConstants.bodyMedium.copyWith(
+                            color: AppConstants.textSecondary,
+                          ),
+                        ),
+                        const Divider(color: AppConstants.dividerColor),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Total Amount:',
+                              style: AppConstants.bodyLarge,
                             ),
-                          )),
-                      const SizedBox(height: 8),
-                      const Divider(color: AppConstants.dividerColor),
-                      const SizedBox(height: 8),
-                      Row(
+                            Text(
+                              Formatters.formatCurrency(order.totalAmount),
+                              style: AppConstants.headingMedium.copyWith(
+                                color: AppConstants.primaryOrange,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: AppConstants.paddingLarge),
+
+                  // Payment Method Selection
+                  const Text('Payment Method', style: AppConstants.bodyLarge),
+                  const SizedBox(height: AppConstants.paddingSmall),
+
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: paymentMethods.map((method) {
+                      final isSelected = selectedPaymentMethod == method;
+                      return ChoiceChip(
+                        label: Text(method),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setDialogState(() {
+                            selectedPaymentMethod = method;
+                            if (method != 'Cash') {
+                              amountPaid = order.totalAmount;
+                              change = 0;
+                            }
+                          });
+                        },
+                        selectedColor: AppConstants.primaryOrange,
+                        backgroundColor: AppConstants.darkSecondary,
+                        labelStyle: TextStyle(
+                          color: isSelected
+                              ? Colors.white
+                              : AppConstants.textPrimary,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+
+                  const SizedBox(height: AppConstants.paddingLarge),
+
+                  // Cash Payment Section
+                  if (selectedPaymentMethod == 'Cash') ...[
+                    const Text('Amount Paid', style: AppConstants.bodyLarge),
+                    const SizedBox(height: AppConstants.paddingSmall),
+
+                    // ADD THIS: TextEditingController
+                    Builder(
+                      builder: (context) {
+                        final amountController = TextEditingController(
+                          text: amountPaid > 0
+                              ? amountPaid.toStringAsFixed(2)
+                              : '',
+                        );
+
+                        return TextField(
+                          controller: amountController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            hintText: 'Enter amount',
+                            prefixText: '₱ ',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(
+                                AppConstants.radiusSmall,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: AppConstants.darkSecondary,
+                          ),
+                          onChanged: (value) {
+                            setDialogState(() {
+                              amountPaid = double.tryParse(value) ?? 0;
+                              change = amountPaid - order.totalAmount;
+                            });
+                          },
+                        );
+                      },
+                    ),
+
+                    const SizedBox(height: AppConstants.paddingMedium),
+
+                    // Quick Amount Buttons
+                    const Text('Quick Amount', style: AppConstants.bodyMedium),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children:
+                          [
+                            50.0,
+                            100.0,
+                            200.0,
+                            500.0,
+                            1000.0,
+                            order.totalAmount,
+                          ].map((amount) {
+                            return OutlinedButton(
+                              onPressed: () {
+                                setDialogState(() {
+                                  amountPaid = amount;
+                                  change = amountPaid - order.totalAmount;
+                                });
+                              },
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppConstants.primaryOrange,
+                                side: const BorderSide(
+                                  color: AppConstants.primaryOrange,
+                                ),
+                              ),
+                              child: Text(Formatters.formatCurrency(amount)),
+                            );
+                          }).toList(),
+                    ),
+
+                    const SizedBox(height: AppConstants.paddingMedium),
+
+                    // Change Display
+                    Container(
+                      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                      decoration: BoxDecoration(
+                        color: change >= 0
+                            ? AppConstants.successGreen.withOpacity(0.1)
+                            : AppConstants.errorRed.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(
+                          AppConstants.radiusMedium,
+                        ),
+                        border: Border.all(
+                          color: change >= 0
+                              ? AppConstants.successGreen
+                              : AppConstants.errorRed,
+                          width: 2,
+                        ),
+                      ),
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Total Amount', style: AppConstants.bodyLarge),
+                          const Text('Change', style: AppConstants.bodyLarge),
                           Text(
-                            Formatters.formatCurrency(order.totalAmount),
-                            style: AppConstants.headingSmall.copyWith(
-                              color: AppConstants.primaryOrange,
+                            Formatters.formatCurrency(change > 0 ? change : 0),
+                            style: AppConstants.headingMedium.copyWith(
+                              color: change >= 0
+                                  ? AppConstants.successGreen
+                                  : AppConstants.errorRed,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: AppConstants.paddingLarge),
-                
-                // Payment Method
-                const Text('Payment Method', style: AppConstants.bodyLarge),
-                const SizedBox(height: AppConstants.paddingSmall),
-                
-                ...paymentMethods.map((method) {
-                  IconData icon;
-                  switch (method) {
-                    case 'Cash':
-                      icon = Icons.money;
-                      break;
-                    case 'Credit Card':
-                      icon = Icons.credit_card;
-                      break;
-                    case 'Debit Card':
-                      icon = Icons.credit_card;
-                      break;
-                    case 'GCash':
-                      icon = Icons.phone_android;
-                      break;
-                    case 'PayMaya':
-                      icon = Icons.phone_android;
-                      break;
-                    default:
-                      icon = Icons.payment;
-                  }
-                  
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: AppConstants.paddingSmall),
-                    decoration: BoxDecoration(
-                      color: selectedPaymentMethod == method
-                          ? AppConstants.primaryOrange.withOpacity(0.2)
-                          : AppConstants.darkSecondary,
-                      borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
-                      border: Border.all(
-                        color: selectedPaymentMethod == method
-                            ? AppConstants.primaryOrange
-                            : AppConstants.dividerColor,
-                        width: selectedPaymentMethod == method ? 2 : 1,
-                      ),
                     ),
-                    child: RadioListTile<String>(
-                      title: Row(
-                        children: [
-                          Icon(icon, size: 20, color: AppConstants.primaryOrange),
-                          const SizedBox(width: 8),
-                          Text(method, style: AppConstants.bodyMedium),
-                        ],
-                      ),
-                      value: method,
-                      groupValue: selectedPaymentMethod,
-                      activeColor: AppConstants.primaryOrange,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          selectedPaymentMethod = value!;
-                        });
-                      },
-                    ),
-                  );
-                }).toList(),
-                
-                const SizedBox(height: AppConstants.paddingLarge),
-                
-                // Amount Paid Section (only for Cash)
-                if (selectedPaymentMethod == 'Cash') ...[
-                  const Text('Amount Paid', style: AppConstants.bodyLarge),
-                  const SizedBox(height: AppConstants.paddingSmall),
-                  
-                  // Amount Input
-                  TextField(
-                    controller: amountPaidController,
-                    keyboardType: TextInputType.number,
-                    style: AppConstants.headingMedium,
-                    decoration: InputDecoration(
-                      hintText: '0.00',
-                      prefixText: '₱ ',
-                      hintStyle: AppConstants.headingMedium.copyWith(
-                        color: AppConstants.textSecondary,
-                      ),
-                      filled: true,
-                      fillColor: AppConstants.darkSecondary,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
-                        borderSide: const BorderSide(color: AppConstants.dividerColor),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
-                        borderSide: const BorderSide(color: AppConstants.dividerColor),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
-                        borderSide: const BorderSide(color: AppConstants.primaryOrange, width: 2),
-                      ),
-                    ),
-                    onChanged: (value) {
-                      setDialogState(() {
-                        amountPaid = double.tryParse(value) ?? 0.0;
-                        change = amountPaid - order.totalAmount;
-                      });
-                    },
-                  ),
-                  
-                  const SizedBox(height: AppConstants.paddingMedium),
-                  
-                  // Preset Amount Buttons
-                  const Text('Quick Amount', style: AppConstants.bodySmall),
-                  const SizedBox(height: AppConstants.paddingSmall),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: presetAmounts.map((amount) {
-                      return OutlinedButton(
-                        onPressed: () {
-                          setDialogState(() {
-                            amountPaid = amount;
-                            change = amountPaid - order.totalAmount;
-                            amountPaidController.text = amount.toStringAsFixed(2);
-                          });
-                        },
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppConstants.primaryOrange,
-                          side: const BorderSide(color: AppConstants.primaryOrange),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        ),
-                        child: Text(
-                          Formatters.formatCurrency(amount),
-                          style: AppConstants.bodySmall,
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  
-                  const SizedBox(height: AppConstants.paddingLarge),
-                  
-                  // Change Display
-                  Container(
-                    padding: const EdgeInsets.all(AppConstants.paddingMedium),
-                    decoration: BoxDecoration(
-                      color: change >= 0 
-                          ? AppConstants.successGreen.withOpacity(0.1)
-                          : AppConstants.errorRed.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
-                      border: Border.all(
-                        color: change >= 0 
-                            ? AppConstants.successGreen
-                            : AppConstants.errorRed,
-                        width: 2,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Change',
-                          style: AppConstants.bodyLarge.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          Formatters.formatCurrency(change > 0 ? change : 0),
-                          style: AppConstants.headingMedium.copyWith(
-                            color: change >= 0 
-                                ? AppConstants.successGreen
-                                : AppConstants.errorRed,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  if (change < 0)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.warning,
-                            color: AppConstants.errorRed,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Insufficient amount paid',
-                            style: AppConstants.bodySmall.copyWith(
+
+                    if (change < 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.warning,
                               color: AppConstants.errorRed,
+                              size: 16,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 4),
+                            Text(
+                              'Insufficient amount paid',
+                              style: AppConstants.bodySmall.copyWith(
+                                color: AppConstants.errorRed,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
           actions: [
@@ -959,9 +946,11 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                   : () {
                       Navigator.pop(context);
                       _processPayment(
-                        order, 
+                        order,
                         selectedPaymentMethod,
-                        selectedPaymentMethod == 'Cash' ? amountPaid : order.totalAmount,
+                        selectedPaymentMethod == 'Cash'
+                            ? amountPaid
+                            : order.totalAmount,
                         selectedPaymentMethod == 'Cash' ? change : 0,
                       );
                     },
@@ -971,10 +960,6 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                 backgroundColor: AppConstants.successGreen,
                 foregroundColor: Colors.white,
                 disabledBackgroundColor: AppConstants.textSecondary,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
               ),
             ),
           ],
@@ -983,174 +968,208 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
     );
   }
 
-  /// Process payment
-  Future<void> _processPayment(
+  /// Process payment and save to Firebase
+  void _processPayment(
     Order order,
     String paymentMethod,
     double amountPaid,
     double change,
   ) async {
-    final previousStatus = order.status;
+    print('💳 Processing payment for Order #${order.id}');
+
+    // Get TransactionService
+    final transactionService = Provider.of<TransactionService>(
+      context,
+      listen: false,
+    );
+
+    // Update order status
     setState(() {
       order.status = OrderStatus.completed;
     });
 
-    try {
-      await _orderService.updateOrderStatus(order.id, OrderStatus.completed);
-      final tableError = await _clearTableForOrder(order);
+    // Save transaction to Firebase
+    print('💾 Saving to Firebase...');
+    final result = await transactionService.saveCheckout(
+      order: order,
+      paymentMethod: paymentMethod,
+      amountPaid: amountPaid,
+      change: change,
+      allowOverwrite: true,
+      metadata: const {'source': 'checkout'},
+    );
+
+    print('📊 Result: $result');
+
+    if (!mounted) return;
+
+    if (result['success']) {
+      String? tableError;
+      try {
+        await _orderService.updateOrderStatus(order.id, OrderStatus.completed);
+        if (_shouldReleaseTable(order, OrderStatus.completed)) {
+          tableError = await _clearTableForOrder(order);
+        }
+      } catch (e) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update order status: $e'),
+            backgroundColor: AppConstants.errorRed,
+          ),
+        );
+      }
       if (tableError != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Payment completed but failed to release Table ${order.tableNumber}: $tableError',
+              'Unable to release Table ${order.tableNumber}: $tableError',
             ),
             backgroundColor: AppConstants.errorRed,
           ),
         );
       }
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        order.status = previousStatus;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to complete payment: $e'),
-          backgroundColor: AppConstants.errorRed,
-        ),
-      );
-      return;
-    }
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppConstants.cardBackground,
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.check_circle,
-              color: AppConstants.successGreen,
-              size: 64,
-            ),
-            const SizedBox(height: AppConstants.paddingMedium),
-            const Text(
-              'Payment Successful!',
-              style: AppConstants.headingMedium,
-            ),
-            const SizedBox(height: AppConstants.paddingSmall),
-            Text(
-              'Order #${order.id}',
-              style: AppConstants.bodyLarge,
-            ),
-            Text(
-              _formatTableLabel(order.tableNumber),
-              style: AppConstants.bodyMedium.copyWith(
-                color: AppConstants.textSecondary,
+      // Show success dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          backgroundColor: AppConstants.cardBackground,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.check_circle,
+                color: AppConstants.successGreen,
+                size: 64,
               ),
-            ),
-            const SizedBox(height: AppConstants.paddingMedium),
-            Container(
-              padding: const EdgeInsets.all(AppConstants.paddingMedium),
-              decoration: BoxDecoration(
-                color: AppConstants.darkSecondary,
-                borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+              const SizedBox(height: AppConstants.paddingMedium),
+              const Text(
+                'Payment Successful!',
+                style: AppConstants.headingMedium,
               ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Total Amount:', style: AppConstants.bodyMedium),
-                      Text(
-                        Formatters.formatCurrency(order.totalAmount),
-                        style: AppConstants.bodyLarge.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (paymentMethod == 'Cash') ...[
-                    const SizedBox(height: 8),
+              const SizedBox(height: AppConstants.paddingSmall),
+              Text('Order #${order.id}', style: AppConstants.bodyLarge),
+              Text(
+                'Table ${order.tableNumber}',
+                style: AppConstants.bodyMedium.copyWith(
+                  color: AppConstants.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Transaction ID: ${result['transactionId']}',
+                style: AppConstants.bodySmall.copyWith(
+                  color: AppConstants.successGreen,
+                ),
+              ),
+              const SizedBox(height: AppConstants.paddingMedium),
+              Container(
+                padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                decoration: BoxDecoration(
+                  color: AppConstants.darkSecondary,
+                  borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+                ),
+                child: Column(
+                  children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Amount Paid:', style: AppConstants.bodyMedium),
+                        Text('Total:', style: AppConstants.bodyMedium),
                         Text(
-                          Formatters.formatCurrency(amountPaid),
+                          Formatters.formatCurrency(order.totalAmount),
                           style: AppConstants.bodyLarge.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
+                    if (paymentMethod == 'Cash') ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Paid:', style: AppConstants.bodyMedium),
+                          Text(
+                            Formatters.formatCurrency(amountPaid),
+                            style: AppConstants.bodyLarge.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Change:', style: AppConstants.bodyMedium),
+                          Text(
+                            Formatters.formatCurrency(change),
+                            style: AppConstants.bodyLarge.copyWith(
+                              color: AppConstants.successGreen,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    const Divider(color: AppConstants.dividerColor),
                     const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Change:', style: AppConstants.bodyMedium),
+                        Text('Payment:', style: AppConstants.bodyMedium),
                         Text(
-                          Formatters.formatCurrency(change),
-                          style: AppConstants.bodyLarge.copyWith(
-                            color: AppConstants.successGreen,
+                          paymentMethod,
+                          style: AppConstants.bodyMedium.copyWith(
+                            color: AppConstants.primaryOrange,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
                   ],
-                  const SizedBox(height: 8),
-                  const Divider(color: AppConstants.dividerColor),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Payment Method:', style: AppConstants.bodyMedium),
-                      Text(
-                        paymentMethod,
-                        style: AppConstants.bodyMedium.copyWith(
-                          color: AppConstants.primaryOrange,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                // TODO: Print receipt
+              },
+              child: const Text('Print Receipt'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppConstants.primaryOrange,
+              ),
+              child: const Text('Done'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: Print receipt
-            },
-            child: const Text('Print Receipt'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppConstants.primaryOrange,
-            ),
-            child: const Text('Done'),
-          ),
-        ],
-      ),
-    );
+      );
+    } else {
+      // Show error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message']),
+          backgroundColor: AppConstants.errorRed,
+        ),
+      );
+    }
   }
 
   /// Create new order
   Future<void> _createNewOrder() async {
     final order = await Navigator.push<Order>(
       context,
-      MaterialPageRoute(
-        builder: (context) => const NewOrderScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const NewOrderScreen()),
     );
 
     if (order != null && mounted) {
@@ -1185,6 +1204,24 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
       return null;
     } catch (e) {
       return e.toString();
+    }
+  }
+
+  /// Get payment icon
+  IconData _getPaymentIcon(String method) {
+    switch (method) {
+      case 'Cash':
+        return Icons.money;
+      case 'Credit Card':
+        return Icons.credit_card;
+      case 'Debit Card':
+        return Icons.payment;
+      case 'GCash':
+        return Icons.account_balance_wallet;
+      case 'PayMaya':
+        return Icons.wallet;
+      default:
+        return Icons.payment;
     }
   }
 }

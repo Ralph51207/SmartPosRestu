@@ -24,12 +24,16 @@ class OrderItem {
   final String name;
   final int quantity;
   final double price;
+  final String? category;
+  final String? categoryLabel;
 
   OrderItem({
     required this.id,
     required this.name,
     required this.quantity,
     required this.price,
+    this.category,
+    this.categoryLabel,
   });
 
   double get totalPrice => price * quantity;
@@ -40,6 +44,8 @@ class OrderItem {
       'name': name,
       'quantity': quantity,
       'price': price,
+      'category': category,
+      'categoryLabel': categoryLabel,
     };
   }
 
@@ -64,6 +70,8 @@ class OrderItem {
       name: name,
       quantity: quantity,
       price: price,
+      category: map['category']?.toString(),
+      categoryLabel: map['categoryLabel']?.toString(),
     );
   }
 }
@@ -126,14 +134,20 @@ class Order {
       orElse: () => OrderStatus.pending,
     );
 
-    final rawItems = map['items'];
     final items = <OrderItem>[];
+    final rawItems = map['items'];
     if (rawItems is List) {
       for (final item in rawItems) {
         if (item is Map) {
           items.add(OrderItem.fromJson(Map<dynamic, dynamic>.from(item)));
         }
       }
+    } else if (rawItems is Map) {
+      rawItems.forEach((key, value) {
+        if (value is Map) {
+          items.add(OrderItem.fromJson(Map<dynamic, dynamic>.from(value)));
+        }
+      });
     }
 
     return Order(
