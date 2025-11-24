@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
+import '../models/analytics_calendar_model.dart';
 import '../models/sales_data_model.dart';
+import '../services/analytics_calendar_service.dart';
 import '../services/forecast_service.dart';
 import '../utils/constants.dart';
 import '../utils/formatters.dart';
@@ -17,10 +20,18 @@ class AnalyticsScreen extends StatefulWidget {
 class _AnalyticsScreenState extends State<AnalyticsScreen>
     with SingleTickerProviderStateMixin {
   final ForecastService _forecastService = ForecastService();
+  final AnalyticsCalendarService _analyticsCalendarService =
+      AnalyticsCalendarService();
   late TabController _tabController;
   List<SalesForecast> _forecasts = [];
   List<String> _insights = [];
   bool _isLoading = true;
+  WeatherCalendarMonth? _calendarMonth;
+  List<EventImpact> _eventImpacts = [];
+  bool _isCalendarLoading = true;
+  bool _isImpactsLoading = true;
+  String? _calendarError;
+  String? _impactsError;
   
   // Date range filters
   String _selectedForecastRange = '7 Days';
@@ -452,12 +463,29 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   Widget _buildForecastRangeButton(String range) {
     final isSelected = _selectedForecastRange == range;
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
+        if (_selectedForecastRange == range) {
+          return;
+        }
         setState(() {
           _selectedForecastRange = range;
-          // Reset calendar to current month when changing forecast range
-          _selectedCalendarMonth = DateTime.now();
         });
+        final nowMonth = DateTime.now();
+        try {
+          await _reloadCalendarForMonth(
+            DateTime(nowMonth.year, nowMonth.month, 1),
+          );
+        } catch (e) {
+          if (!mounted) {
+            return;
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to refresh calendar: $e'),
+              backgroundColor: AppConstants.errorRed,
+            ),
+          );
+        }
       },
       child: Container(
         padding: const EdgeInsets.symmetric(
@@ -479,6 +507,73 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _reloadCalendarForMonth(DateTime month) async {
+    setState(() {
+      _selectedCalendarMonth = month;
+      _isCalendarLoading = true;
+      _isImpactsLoading = true;
+      _calendarError = null;
+      _impactsError = null;
+    });
+
+    try {
+      final monthStart = DateTime(month.year, month.month, 1);
+      final monthEnd = DateTime(month.year, month.month + 1, 0);
+
+      final calendar = await _analyticsCalendarService.fetchMonth(
+        month,
+        fallbackRangeDays: _selectedRangeInDays(),
+      );
+      final impacts = await _analyticsCalendarService.fetchImpacts(
+        start: monthStart,
+        end: monthEnd,
+        fallbackRangeDays: _selectedRangeInDays(),
+      );
+
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _calendarMonth = calendar;
+        _eventImpacts = impacts;
+        _isCalendarLoading = false;
+        _isImpactsLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isCalendarLoading = false;
+        _isImpactsLoading = false;
+        _calendarError = e.toString();
+        _impactsError = e.toString();
+      });
+      rethrow;
+    }
+  }
+
+  Future<void> _changeCalendarMonth(int offset) async {
+    final newMonth = DateTime(
+      _selectedCalendarMonth.year,
+      _selectedCalendarMonth.month + offset,
+      1,
+    );
+    try {
+      await _reloadCalendarForMonth(newMonth);
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load calendar data: $e'),
+          backgroundColor: AppConstants.errorRed,
+        ),
+      );
+    }
   }
 
   /// Sales Trend Section
@@ -757,22 +852,201 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
   /// Weather and Events Calendar
   Widget _buildWeatherCalendar() {
-    final firstDayOfMonth = DateTime(_selectedCalendarMonth.year, _selectedCalendarMonth.month, 1);
-    final lastDayOfMonth = DateTime(_selectedCalendarMonth.year, _selectedCalendarMonth.month + 1, 0);
+    final firstDayOfMonth = DateTime(
+      _selectedCalendarMonth.year,
+      _selectedCalendarMonth.month,
+      1,
+    );
+    final lastDayOfMonth = DateTime(
+      _selectedCalendarMonth.year,
+      _selectedCalendarMonth.month + 1,
+      0,
+    );
     final daysInMonth = lastDayOfMonth.day;
-    final startingWeekday = firstDayOfMonth.weekday % 7; // 0 = Sunday
+    final startingWeekday = firstDayOfMonth.weekday % 7;
     final now = DateTime.now();
-    
-    // Sample weather data for the month (cycling through weather icons)
-    final weatherIcons = ['☀️', '⛅', '�️', '☁️', '🌧️', '⛈️'];
-    // Sample events (you can replace with actual event data)
-    final events = {
-      10: 'Holiday',
-      13: 'Event',
-      14: 'Event',
-      20: 'Holiday',
-      25: 'Event',
-    };
+
+    Widget buildCalendarBody() {
+      if (_isCalendarLoading) {
+        return SizedBox(
+          height: 260,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(color: AppConstants.primaryOrange),
+                const SizedBox(height: AppConstants.paddingSmall),
+                const Text(
+                  'Loading calendar...',
+                  style: AppConstants.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      if (_calendarError != null) {
+        return SizedBox(
+          height: 260,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, color: AppConstants.errorRed),
+                const SizedBox(height: AppConstants.paddingSmall),
+                Text(
+                  _calendarError!,
+                  style: AppConstants.bodySmall.copyWith(
+                    color: AppConstants.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppConstants.paddingSmall),
+                ElevatedButton.icon(
+                  onPressed: () => _changeCalendarMonth(0),
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('Retry'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppConstants.primaryOrange,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      final hasRangeOverlap =
+          _monthOverlapsForecastRange(_selectedCalendarMonth);
+      final calendar = _calendarMonth ?? WeatherCalendarMonth(
+        month: _selectedCalendarMonth,
+        days: const [],
+      );
+
+      if (calendar.isEmpty && hasRangeOverlap) {
+        return SizedBox(
+          height: 260,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.event_busy, color: AppConstants.textSecondary),
+                const SizedBox(height: AppConstants.paddingSmall),
+                const Text(
+                  'No calendar data for this month yet.',
+                  style: AppConstants.bodySmall,
+                ),
+                const SizedBox(height: AppConstants.paddingSmall),
+                Text(
+                  'Add documents under analytics_calendar/<yyyy-MM> in Firestore to populate this view.',
+                  style: AppConstants.bodySmall.copyWith(
+                    color: AppConstants.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      return Column(
+        children: List.generate((daysInMonth + startingWeekday) ~/ 7 + 1, (weekIndex) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: List.generate(7, (dayIndex) {
+                final dayNumber = weekIndex * 7 + dayIndex - startingWeekday + 1;
+
+                if (dayNumber < 1 || dayNumber > daysInMonth) {
+                  return const Expanded(child: SizedBox(height: 70));
+                }
+
+                final currentDate = DateTime(
+                  _selectedCalendarMonth.year,
+                  _selectedCalendarMonth.month,
+                  dayNumber,
+                );
+                final isToday = currentDate.year == now.year &&
+                    currentDate.month == now.month &&
+                    currentDate.day == now.day;
+                final isInForecastRange =
+                  _isWithinSelectedForecastRange(currentDate);
+                final weatherDay = isInForecastRange
+                  ? calendar.dayForNumber(dayNumber)
+                  : null;
+                final hasEvent = weatherDay?.hasEvent ?? false;
+                final hasWeather = weatherDay != null;
+
+                final backgroundColor = isToday
+                    ? AppConstants.primaryOrange.withOpacity(0.2)
+                    : hasEvent
+                        ? AppConstants.primaryOrange.withOpacity(0.12)
+                        : isInForecastRange
+                            ? AppConstants.successGreen.withOpacity(0.08)
+                            : AppConstants.darkSecondary.withOpacity(0.5);
+
+                final borderColor = isToday
+                    ? AppConstants.primaryOrange
+                    : hasEvent
+                        ? AppConstants.primaryOrange
+                        : isInForecastRange
+                            ? AppConstants.successGreen.withOpacity(0.6)
+                            : AppConstants.dividerColor.withOpacity(0.3);
+
+                return Expanded(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: backgroundColor,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: borderColor,
+                        width: isToday ? 2 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '$dayNumber',
+                          style: AppConstants.bodyMedium.copyWith(
+                            fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+                            color: isToday
+                                ? AppConstants.primaryOrange
+                                : AppConstants.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        hasWeather && isInForecastRange
+                            ? Text(
+                                weatherDay?.emoji ?? '–',
+                                style: const TextStyle(fontSize: 16),
+                              )
+                            : const SizedBox(height: 16),
+                        const SizedBox(height: 2),
+                        hasEvent && isInForecastRange
+                            ? Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  color: AppConstants.primaryOrange,
+                                  shape: BoxShape.circle,
+                                ),
+                              )
+                            : const SizedBox(height: 6),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ),
+          );
+        }),
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
@@ -784,50 +1058,28 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Month and Year Header with Navigation
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Previous Month Button
               IconButton(
                 icon: Icon(Icons.chevron_left, color: AppConstants.primaryOrange),
-                onPressed: () {
-                  setState(() {
-                    _selectedCalendarMonth = DateTime(
-                      _selectedCalendarMonth.year,
-                      _selectedCalendarMonth.month - 1,
-                      1,
-                    );
-                  });
-                },
+                onPressed: () => _changeCalendarMonth(-1),
                 tooltip: 'Previous Month',
               ),
-              // Month and Year Display
               Text(
                 '${_getMonthName(_selectedCalendarMonth.month)} ${_selectedCalendarMonth.year}',
                 style: AppConstants.bodyLarge.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              // Next Month Button
               IconButton(
                 icon: Icon(Icons.chevron_right, color: AppConstants.primaryOrange),
-                onPressed: () {
-                  setState(() {
-                    _selectedCalendarMonth = DateTime(
-                      _selectedCalendarMonth.year,
-                      _selectedCalendarMonth.month + 1,
-                      1,
-                    );
-                  });
-                },
+                onPressed: () => _changeCalendarMonth(1),
                 tooltip: 'Next Month',
               ),
             ],
           ),
           const SizedBox(height: AppConstants.paddingSmall),
-          
-          // Legend
           Wrap(
             alignment: WrapAlignment.center,
             spacing: 16,
@@ -862,7 +1114,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   Container(
                     width: 8,
                     height: 8,
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: AppConstants.primaryOrange,
                       shape: BoxShape.circle,
                     ),
@@ -879,8 +1131,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             ],
           ),
           const SizedBox(height: AppConstants.paddingMedium),
-          
-          // Weekday Headers
           Row(
             children: ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((day) {
               return Expanded(
@@ -897,109 +1147,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             }).toList(),
           ),
           const SizedBox(height: 8),
-          
-          // Calendar Grid
-          ...List.generate((daysInMonth + startingWeekday) ~/ 7 + 1, (weekIndex) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: List.generate(7, (dayIndex) {
-                  final dayNumber = weekIndex * 7 + dayIndex - startingWeekday + 1;
-                  
-                  if (dayNumber < 1 || dayNumber > daysInMonth) {
-                    return Expanded(child: SizedBox(height: 70));
-                  }
-                  
-                  final currentDate = DateTime(_selectedCalendarMonth.year, _selectedCalendarMonth.month, dayNumber);
-                  final isToday = dayNumber == now.day && 
-                                  _selectedCalendarMonth.month == now.month &&
-                                  _selectedCalendarMonth.year == now.year;
-                  
-                  // Calculate forecast end date based on selected range
-                  final forecastDays = _selectedForecastRange == '7 Days' 
-                      ? 7 
-                      : _selectedForecastRange == '14 Days' 
-                          ? 14 
-                          : 30;
-                  final forecastEndDate = now.add(Duration(days: forecastDays - 1));
-                  final isInForecastRange = currentDate.isAfter(now.subtract(Duration(days: 1))) && 
-                                           currentDate.isBefore(forecastEndDate.add(Duration(days: 1)));
-                  
-                  final hasEvent = events.containsKey(dayNumber);
-                  final weatherIcon = weatherIcons[dayNumber % weatherIcons.length];
-                  
-                  return Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: isToday 
-                            ? AppConstants.primaryOrange.withOpacity(0.2)
-                            : isInForecastRange
-                                ? AppConstants.successGreen.withOpacity(0.05)
-                                : AppConstants.darkSecondary.withOpacity(0.5),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isToday 
-                              ? AppConstants.primaryOrange
-                              : (hasEvent && isInForecastRange)
-                                  ? AppConstants.primaryOrange.withOpacity(0.5)
-                                  : isInForecastRange
-                                      ? AppConstants.successGreen.withOpacity(0.3)
-                                      : AppConstants.dividerColor.withOpacity(0.3),
-                          width: isToday ? 2 : 1,
-                        ),
-                      ),
-                      child: Opacity(
-                        opacity: isInForecastRange || isToday ? 1.0 : 0.4,
-                        child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '$dayNumber',
-                            style: AppConstants.bodyMedium.copyWith(
-                              fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                              color: isToday ? AppConstants.primaryOrange : AppConstants.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          // Show weather and events for dates in forecast range, or placeholder for consistent sizing
-                          if (isInForecastRange || isToday)
-                            Text(
-                              weatherIcon,
-                              style: const TextStyle(fontSize: 16),
-                            )
-                          else
-                            const SizedBox(height: 16), // Placeholder to maintain consistent box height
-                          // Event indicator section - always 8px total height (2px spacing + 6px indicator or just 8px placeholder)
-                          if (isInForecastRange || isToday)
-                            hasEvent
-                              ? Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const SizedBox(height: 2),
-                                    Container(
-                                      width: 6,
-                                      height: 6,
-                                      decoration: BoxDecoration(
-                                        color: AppConstants.primaryOrange,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : const SizedBox(height: 8) // 2px spacing + 6px dot = 8px total
-                          else
-                            const SizedBox(height: 8), // 2px spacing + 6px dot = 8px total
-                        ],
-                      ),
-                    ),
-                    ),
-                  );
-                }),
-              ),
-            );
-          }).toList(),
+          buildCalendarBody(),
         ],
       ),
     );
@@ -1016,44 +1164,91 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
   /// Event and Weather Impact Analysis
   Widget _buildEventWeatherImpact() {
-    final impacts = [
-      {
-        'date': 'Nov 10 (Sunday)',
-        'event': 'Holiday - All Saints Day',
-        'weather': '☀️ Sunny',
-        'impact': '+45%',
-        'expectedSales': '₱18,500',
-        'recommendation': 'Stock up on family meal combos. Add 2 servers for lunch shift.',
-        'color': AppConstants.successGreen,
-      },
-      {
-        'date': 'Nov 14 (Thursday)',
-        'event': 'Local Festival',
-        'weather': '⛅ Partly Cloudy',
-        'impact': '+30%',
-        'expectedSales': '₱15,200',
-        'recommendation': 'Create festival-themed menu items. Extend operating hours.',
-        'color': AppConstants.primaryOrange,
-      },
-      {
-        'date': 'Nov 16 (Saturday)',
-        'event': 'Payday Weekend',
-        'weather': '🌧️ Rainy',
-        'impact': '+20%',
-        'expectedSales': '₱19,800',
-        'recommendation': 'Promote comfort food & hot beverages. Boost delivery options.',
-        'color': Colors.blue,
-      },
-      {
-        'date': 'Nov 20 (Wednesday)',
-        'event': 'Regular Day',
-        'weather': '⛈️ Heavy Rain',
-        'impact': '-25%',
-        'expectedSales': '₱9,400',
-        'recommendation': 'Push delivery promos. Reduce dine-in prep. Create rainy day specials.',
-        'color': AppConstants.warningYellow,
-      },
-    ];
+    if (_isImpactsLoading) {
+      return Container(
+        padding: const EdgeInsets.all(AppConstants.paddingMedium),
+        decoration: BoxDecoration(
+          color: AppConstants.cardBackground,
+          borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+          border: Border.all(color: AppConstants.dividerColor, width: 1),
+        ),
+        height: 200,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: AppConstants.primaryOrange),
+              const SizedBox(height: AppConstants.paddingSmall),
+              const Text('Loading event impacts...', style: AppConstants.bodySmall),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_impactsError != null) {
+      return Container(
+        padding: const EdgeInsets.all(AppConstants.paddingMedium),
+        decoration: BoxDecoration(
+          color: AppConstants.cardBackground,
+          borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+          border: Border.all(color: AppConstants.dividerColor, width: 1),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.error_outline, color: AppConstants.errorRed),
+            const SizedBox(height: AppConstants.paddingSmall),
+            Text(
+              _impactsError!,
+              style: AppConstants.bodySmall.copyWith(
+                color: AppConstants.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppConstants.paddingSmall),
+            ElevatedButton.icon(
+              onPressed: () => _changeCalendarMonth(0),
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppConstants.primaryOrange,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_eventImpacts.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(AppConstants.paddingMedium),
+        decoration: BoxDecoration(
+          color: AppConstants.cardBackground,
+          borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+          border: Border.all(color: AppConstants.dividerColor, width: 1),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.event_note, color: AppConstants.textSecondary),
+            const SizedBox(height: AppConstants.paddingSmall),
+            Text(
+              'No upcoming events found for this month.',
+              style: AppConstants.bodySmall.copyWith(
+                color: AppConstants.textSecondary,
+              ),
+            ),
+            const SizedBox(height: AppConstants.paddingSmall),
+            Text(
+              'Add records in analytics_impacts with a date inside this month to see projections here.',
+              style: AppConstants.bodySmall.copyWith(
+                color: AppConstants.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
@@ -1063,7 +1258,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         border: Border.all(color: AppConstants.dividerColor, width: 1),
       ),
       child: Column(
-        children: impacts.map((impact) {
+        children: _eventImpacts.map((impact) {
+          final color = _eventImpactColor(impact);
+          final impactPercent = _formatImpactPercent(impact.impactPercent);
+          final expectedSales = impact.expectedSales;
+
           return Container(
             margin: const EdgeInsets.only(bottom: AppConstants.paddingMedium),
             padding: const EdgeInsets.all(AppConstants.paddingMedium),
@@ -1071,7 +1270,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               color: AppConstants.darkSecondary,
               borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
               border: Border.all(
-                color: (impact['color'] as Color).withOpacity(0.3),
+                color: color.withOpacity(0.3),
                 width: 1,
               ),
             ),
@@ -1085,7 +1284,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            impact['date'] as String,
+                            _formatImpactDate(impact.date),
                             style: AppConstants.bodyLarge.copyWith(
                               fontWeight: FontWeight.bold,
                               color: AppConstants.textPrimary,
@@ -1095,14 +1294,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                           Row(
                             children: [
                               Text(
-                                impact['weather'] as String,
+                                impact.emoji,
                                 style: const TextStyle(fontSize: 16),
                               ),
                               const SizedBox(width: 8),
-                              Text(
-                                impact['event'] as String,
-                                style: AppConstants.bodySmall.copyWith(
-                                  color: AppConstants.textSecondary,
+                              Expanded(
+                                child: Text(
+                                  _buildImpactHeadline(impact),
+                                  style: AppConstants.bodySmall.copyWith(
+                                    color: AppConstants.textSecondary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
@@ -1116,23 +1318,25 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: (impact['color'] as Color).withOpacity(0.2),
+                            color: color.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            impact['impact'] as String,
+                            impactPercent,
                             style: AppConstants.bodySmall.copyWith(
-                              color: impact['color'] as Color,
+                              color: color,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          impact['expectedSales'] as String,
+                          expectedSales != null
+                              ? Formatters.formatCurrency(expectedSales)
+                              : '—',
                           style: AppConstants.bodyLarge.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: impact['color'] as Color,
+                            color: color,
                           ),
                         ),
                       ],
@@ -1140,31 +1344,33 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   ],
                 ),
                 const SizedBox(height: AppConstants.paddingSmall),
-                Container(
-                  padding: const EdgeInsets.all(AppConstants.paddingSmall),
-                  decoration: BoxDecoration(
-                    color: (impact['color'] as Color).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.lightbulb_outline,
-                        size: 16,
-                        color: impact['color'] as Color,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          impact['recommendation'] as String,
-                          style: AppConstants.bodySmall.copyWith(
-                            color: AppConstants.textSecondary,
+                if ((impact.recommendation ?? '').isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(AppConstants.paddingSmall),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.lightbulb_outline,
+                          size: 16,
+                          color: color,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            impact.recommendation!,
+                            style: AppConstants.bodySmall.copyWith(
+                              color: AppConstants.textSecondary,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
               ],
             ),
           );
@@ -3858,28 +4064,67 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   Future<void> _loadAnalyticsData() async {
     setState(() {
       _isLoading = true;
+      _isCalendarLoading = true;
+      _isImpactsLoading = true;
+      _calendarError = null;
+      _impactsError = null;
     });
 
     try {
-      final startDate = DateTime.now();
-      final endDate = startDate.add(const Duration(days: 7));
+      final now = DateTime.now();
+      final forecastRange = Duration(days: _selectedRangeInDays());
+      final forecastsFuture = _forecastService.getSalesForecast(
+        startDate: now,
+        endDate: now.add(forecastRange),
+      );
+      final insightsFuture = _forecastService.getSalesInsights();
 
-      final forecasts = await _forecastService.getSalesForecast(
-        startDate: startDate,
-        endDate: endDate,
+      final monthStart = DateTime(
+        _selectedCalendarMonth.year,
+        _selectedCalendarMonth.month,
+        1,
+      );
+      final monthEnd = DateTime(
+        _selectedCalendarMonth.year,
+        _selectedCalendarMonth.month + 1,
+        0,
       );
 
-      final insights = await _forecastService.getSalesInsights();
+      final calendarFuture = _analyticsCalendarService.fetchMonth(
+        _selectedCalendarMonth,
+        fallbackRangeDays: _selectedRangeInDays(),
+      );
+      final impactsFuture = _analyticsCalendarService.fetchImpacts(
+        start: monthStart,
+        end: monthEnd,
+        fallbackRangeDays: _selectedRangeInDays(),
+      );
+
+      final forecasts = await forecastsFuture;
+      final insights = await insightsFuture;
+      final calendar = await calendarFuture;
+      final impacts = await impactsFuture;
 
       setState(() {
         _forecasts = forecasts;
         _insights = insights;
+        _calendarMonth = calendar;
+        _eventImpacts = impacts;
         _isLoading = false;
+        _isCalendarLoading = false;
+        _isImpactsLoading = false;
       });
     } catch (e) {
       setState(() {
         _isLoading = false;
+        _isCalendarLoading = false;
+        _isImpactsLoading = false;
+        _calendarError ??= e.toString();
+        _impactsError ??= e.toString();
       });
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error loading analytics: $e'),
@@ -3887,6 +4132,85 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         ),
       );
     }
+  }
+
+  int _selectedRangeInDays() {
+    switch (_selectedForecastRange) {
+      case '14 Days':
+        return 14;
+      case '30 Days':
+        return 30;
+      default:
+        return 7;
+    }
+  }
+
+  bool _isWithinSelectedForecastRange(DateTime date) {
+    final today = DateTime.now();
+    final start = DateTime(today.year, today.month, today.day);
+    final end = start.add(Duration(days: _selectedRangeInDays() - 1));
+    return !date.isBefore(start) && !date.isAfter(end);
+  }
+
+  bool _monthOverlapsForecastRange(DateTime month) {
+    final first = DateTime(month.year, month.month, 1);
+    final last = DateTime(month.year, month.month + 1, 0);
+    for (var current = first;
+        !current.isAfter(last);
+        current = current.add(const Duration(days: 1))) {
+      if (_isWithinSelectedForecastRange(current)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  String _formatImpactDate(DateTime date) {
+    final formatter = DateFormat('MMM dd (EEEE)');
+    return formatter.format(date);
+  }
+
+  Color _eventImpactColor(EventImpact impact) {
+    final percent = impact.impactPercent;
+    if (percent == null) {
+      return AppConstants.warningYellow;
+    }
+    if (percent > 0) {
+      return AppConstants.successGreen;
+    }
+    if (percent < 0) {
+      return AppConstants.errorRed;
+    }
+    return AppConstants.primaryOrange;
+  }
+
+  String _formatImpactPercent(double? value) {
+    if (value == null) {
+      return '—';
+    }
+    final rounded = value.abs().toStringAsFixed(0);
+    if (value > 0) {
+      return '+$rounded%';
+    }
+    if (value < 0) {
+      return '-$rounded%';
+    }
+    return '0%';
+  }
+
+  String _buildImpactHeadline(EventImpact impact) {
+    final pieces = <String>[];
+    if (impact.eventName.trim().isNotEmpty) {
+      pieces.add(impact.eventName.trim());
+    }
+    final eventType = (impact.eventType ?? '').trim();
+    if (eventType.isNotEmpty) {
+      pieces.add(eventType);
+    }
+    if (pieces.isEmpty) {
+      pieces.add(impact.condition);
+    }
+    return pieces.join(' • ');
   }
 
   /// Export report
