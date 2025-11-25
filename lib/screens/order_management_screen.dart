@@ -313,9 +313,20 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
       );
     }
 
-    final filteredOrders = _selectedFilter == null
-        ? _orders
-        : _orders.where((order) => order.status == _selectedFilter).toList();
+    final filteredOrders = List<Order>.from(
+      _selectedFilter == null
+          ? _orders
+          : _orders.where((order) => order.status == _selectedFilter),
+    );
+
+    filteredOrders.sort((a, b) {
+      final statusComparison =
+          _statusSortPriority(a.status) - _statusSortPriority(b.status);
+      if (statusComparison != 0) {
+        return statusComparison;
+      }
+      return b.timestamp.compareTo(a.timestamp);
+    });
 
     if (filteredOrders.isEmpty) {
       return Center(
@@ -351,6 +362,21 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
         );
       },
     );
+  }
+
+  int _statusSortPriority(OrderStatus status) {
+    switch (status) {
+      case OrderStatus.pending:
+        return 0;
+      case OrderStatus.ready:
+        return 1;
+      case OrderStatus.preparing:
+        return 2;
+      case OrderStatus.completed:
+        return 3;
+      case OrderStatus.cancelled:
+        return 4;
+    }
   }
 
   /// Show filter dialog
