@@ -276,6 +276,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   /// Build side drawer menu
   Widget _buildDrawer(BuildContext context) {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final firebaseUser = authService.currentUser;
+
     return Drawer(
       backgroundColor: AppConstants.darkBackground,
       child: SafeArea(
@@ -400,51 +403,92 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             ),
 
             // Footer
-            Container(
-              padding: const EdgeInsets.all(AppConstants.paddingLarge),
-              decoration: BoxDecoration(
-                color: AppConstants.darkSecondary,
-                border: Border(
-                  top: BorderSide(
-                    color: AppConstants.dividerColor,
-                    width: 1,
-                  ),
-                ),
-              ),
-              child: Row(
-                children: [
-                  const CircleAvatar(
-                    backgroundColor: AppConstants.primaryOrange,
-                    child: Icon(Icons.person, color: Colors.white),
-                  ),
-                  const SizedBox(width: AppConstants.paddingMedium),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Admin User',
-                          style: AppConstants.bodyMedium,
-                        ),
-                        Text(
-                          'admin@smartserve.com',
-                          style: AppConstants.bodySmall.copyWith(
-                            color: AppConstants.textSecondary,
-                          ),
-                        ),
-                      ],
+            FutureBuilder<Map<String, dynamic>?>(
+              future: authService.fetchUserProfile(),
+              builder: (context, snapshot) {
+                final data = snapshot.data ?? <String, dynamic>{};
+                final loadingProfile =
+                    snapshot.connectionState == ConnectionState.waiting &&
+                        !snapshot.hasData;
+
+                final nameSource = (data['username'] as String?) ??
+                    (data['displayName'] as String?) ??
+                    firebaseUser?.displayName ??
+                    firebaseUser?.email ??
+                    'SmartServe User';
+                final sanitizedName = nameSource.trim().isNotEmpty
+                    ? nameSource.trim()
+                    : 'SmartServe User';
+                final emailSource = (data['email'] as String?) ??
+                    firebaseUser?.email ??
+                    '';
+                final sanitizedEmail = emailSource.trim().isNotEmpty
+                    ? emailSource.trim()
+                    : 'Tap profile to add email';
+                final avatarText = sanitizedName.isNotEmpty
+                    ? sanitizedName[0].toUpperCase()
+                    : 'S';
+
+                return Container(
+                  padding: const EdgeInsets.all(AppConstants.paddingLarge),
+                  decoration: BoxDecoration(
+                    color: AppConstants.darkSecondary,
+                    border: Border(
+                      top: BorderSide(
+                        color: AppConstants.dividerColor,
+                        width: 1,
+                      ),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.logout),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _showLogoutDialog(context);
-                    },
-                    color: AppConstants.errorRed,
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: AppConstants.primaryOrange,
+                        child: loadingProfile
+                            ? CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppConstants.darkBackground,
+                              )
+                            : Text(
+                                avatarText,
+                                style: AppConstants.bodyLarge.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
+                      const SizedBox(width: AppConstants.paddingMedium),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              sanitizedName,
+                              style: AppConstants.bodyMedium,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              sanitizedEmail,
+                              style: AppConstants.bodySmall.copyWith(
+                                color: AppConstants.textSecondary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.logout),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _showLogoutDialog(context);
+                        },
+                        color: AppConstants.errorRed,
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             ),
           ],
         ),
