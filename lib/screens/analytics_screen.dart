@@ -31,12 +31,30 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     'Sat',
     'Sun',
   ];
-  final ForecastService _forecastService = ForecastService();
-  final AnalyticsCalendarService _analyticsCalendarService =
+    final ForecastService _forecastService = ForecastService();
+    final AnalyticsCalendarService _analyticsCalendarService =
       AnalyticsCalendarService();
-  late TabController _tabController;
-  List<SalesForecast> _forecasts = [];
-  List<String> _insights = [];
+    late TabController _tabController;
+    List<SalesForecast> _forecasts = [];
+    List<ForecastSeriesPoint> _forecastProjectedSeries = [];
+    List<ForecastSeriesPoint> _forecastActualSeries = [];
+    List<CategoryDemandProjection> _forecastCategoryDemand = [];
+    List<ChannelDemandProjection> _forecastChannelDemand = [];
+    List<MenuItemPrediction> _forecastMenuPredictions = [];
+    List<_ForecastInsight> _forecastInsights = [];
+    _ForecastActionRecommendation? _forecastAction;
+    double _forecastTotalRevenue = 0;
+    int _forecastTotalOrders = 0;
+    double _forecastAverageOrderValue = 0;
+    double? _forecastRevenueChangePercent;
+    double? _forecastOrdersChangePercent;
+    double? _forecastAovChangePercent;
+    double _forecastAverageConfidence = 0;
+    double _forecastRecentAccuracy = 0;
+    double _forecastOverallAccuracy = 0;
+    double _forecastAccuracyTrend = 0;
+    double _forecastTrafficAccuracy = 0;
+    double _forecastPeakAccuracy = 0;
   bool _isLoading = true;
   WeatherCalendarMonth? _calendarMonth;
   List<EventImpact> _eventImpacts = [];
@@ -499,22 +517,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         setState(() {
           _selectedForecastRange = range;
         });
-        final nowMonth = DateTime.now();
-        try {
-          await _reloadCalendarForMonth(
-            DateTime(nowMonth.year, nowMonth.month, 1),
-          );
-        } catch (e) {
-          if (!mounted) {
-            return;
-          }
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to refresh calendar: $e'),
-              backgroundColor: AppConstants.errorRed,
-            ),
-          );
-        }
+        await _loadAnalyticsData();
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -775,6 +778,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
   /// Forecast Summary Cards
   Widget _buildForecastSummaryCards() {
+    final revenueDelta = _formatDelta(_forecastRevenueChangePercent);
+    final ordersDelta = _formatDelta(_forecastOrdersChangePercent);
+    final aovDelta = _formatDelta(_forecastAovChangePercent);
+
+    final revenueColor = _deltaColor(_forecastRevenueChangePercent);
+    final ordersColor = _deltaColor(_forecastOrdersChangePercent);
+    final aovColor = _deltaColor(_forecastAovChangePercent);
+
+    final action = _forecastAction;
+    final visuals = _insightVisualForKind(action?.kind ?? _ForecastInsightKind.general);
+    final actionPriorityColor = _priorityColor(action?.priority ?? _ForecastInsightPriority.medium);
+
     return Column(
       children: [
         IntrinsicHeight(
@@ -783,20 +798,24 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               Expanded(
                 child: _buildSummaryCard(
                   'Predicted Revenue',
-                  '₱58,450',
-                  '+29.2% vs Historical',
+                  Formatters.formatCurrency(_forecastTotalRevenue),
+                  revenueDelta != null
+                      ? '$revenueDelta vs historical'
+                      : 'No baseline available',
                   Icons.trending_up,
-                  AppConstants.successGreen,
+                  revenueColor,
                 ),
               ),
               const SizedBox(width: AppConstants.paddingMedium),
               Expanded(
                 child: _buildSummaryCard(
                   'Predicted Orders',
-                  '890',
-                  '+22.8% vs Historical',
-                  Icons.receipt,
-                  AppConstants.primaryOrange,
+                  _countFormatter.format(_forecastTotalOrders),
+                  ordersDelta != null
+                      ? '$ordersDelta vs historical'
+                      : 'No baseline available',
+                  Icons.receipt_long,
+                  ordersColor,
                 ),
               ),
             ],
@@ -809,20 +828,23 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               Expanded(
                 child: _buildSummaryCard(
                   'Predicted Avg. Order',
-                  '₱65.67',
-                  '+5.2% vs Historical',
-                  Icons.shopping_cart,
-                  Colors.blue,
+                  Formatters.formatCurrency(_forecastAverageOrderValue),
+                  aovDelta != null
+                      ? '$aovDelta vs historical'
+                      : 'No baseline available',
+                  Icons.shopping_cart_checkout,
+                  aovColor,
                 ),
               ),
               const SizedBox(width: AppConstants.paddingMedium),
               Expanded(
                 child: _buildSummaryCard(
                   'Recommended Action',
-                  'Stock Up Pasta',
-                  'Top predicted item',
-                  Icons.inventory,
-                  AppConstants.warningYellow,
+                  action?.title ?? 'Stay proactive',
+                  action?.subtitle ??
+                      'Use the calendar + demand widgets to align staffing and promotions.',
+                  visuals.icon,
+                  actionPriorityColor,
                 ),
               ),
             ],
@@ -1959,6 +1981,45 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
   /// Projected vs Actual Chart
   Widget _buildProjectedVsActualChart() {
+    if (_forecastProjectedSeries.isEmpty && _forecastActualSeries.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(AppConstants.paddingMedium),
+        decoration: BoxDecoration(
+          color: AppConstants.cardBackground,
+          borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+          border: Border.all(color: AppConstants.dividerColor, width: 1),
+        ),
+        child: Text(
+          'Forecast chart will appear once analytics and projections are available.',
+          style: AppConstants.bodySmall.copyWith(
+            color: AppConstants.textSecondary,
+          ),
+        ),
+      );
+    }
+
+    final projected = List<ForecastSeriesPoint>.from(_forecastProjectedSeries);
+    final actual = List<ForecastSeriesPoint>.from(_forecastActualSeries);
+    final labelSeries = projected.isNotEmpty ? projected : actual;
+    final dateFormatter = DateFormat('MMMd');
+
+    final spotsProjected = projected
+        .asMap()
+        .entries
+        .map((entry) => FlSpot(entry.key.toDouble(), entry.value.revenue))
+        .toList();
+    final spotsActual = actual
+        .asMap()
+        .entries
+        .map((entry) => FlSpot(entry.key.toDouble(), entry.value.revenue))
+        .toList();
+
+    final maxRevenue = _niceCeiling([
+      ...projected.map((point) => point.revenue),
+      ...actual.map((point) => point.revenue),
+    ].fold<double>(0, math.max));
+    final yInterval = _computeYAxisInterval(maxRevenue);
+
     return Container(
       height: 250,
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
@@ -2019,7 +2080,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           Expanded(
             child: LineChart(
               LineChartData(
-                maxY: 18000,
+                maxY: maxRevenue <= 0 ? 100 : maxRevenue,
                 minY: 0,
                 // Interactive tooltips for forecast chart
                 lineTouchData: LineTouchData(
@@ -2035,18 +2096,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                     ),
                     getTooltipItems: (List<LineBarSpot> touchedSpots) {
                       return touchedSpots.map((spot) {
-                        final days = [
-                          'Mon',
-                          'Tue',
-                          'Wed',
-                          'Thu',
-                          'Fri',
-                          'Sat',
-                          'Sun',
-                        ];
                         final isActual = spot.barIndex == 0;
+                        final series = isActual ? actual : projected;
+                        final index = spot.x.toInt().clamp(0, series.length - 1);
+                        final dateLabel = dateFormatter.format(series[index].date);
                         return LineTooltipItem(
-                          '${days[spot.x.toInt()]}\n',
+                          '$dateLabel\n',
                           AppConstants.bodySmall.copyWith(
                             color: AppConstants.textSecondary,
                             fontWeight: FontWeight.bold,
@@ -2061,7 +2116,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                               ),
                             ),
                             TextSpan(
-                              text: '₱${(spot.y / 1000).toStringAsFixed(1)}K',
+                              text: Formatters.formatCurrency(spot.y),
                               style: AppConstants.bodySmall.copyWith(
                                 color: AppConstants.textPrimary,
                                 fontWeight: FontWeight.bold,
@@ -2101,10 +2156,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 50,
-                      interval: 2000,
+                      interval: yInterval,
                       getTitlesWidget: (value, meta) {
+                        final label = value <= 0
+                            ? '₱0'
+                            : '₱${Formatters.formatCompactNumber(value)}';
                         return Text(
-                          '₱${(value / 1000).toStringAsFixed(0)}K',
+                          label,
                           style: AppConstants.bodySmall.copyWith(fontSize: 10),
                         );
                       },
@@ -2115,21 +2173,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       showTitles: true,
                       interval: 1,
                       getTitlesWidget: (value, meta) {
-                        final days = [
-                          'Mon',
-                          'Tue',
-                          'Wed',
-                          'Thu',
-                          'Fri',
-                          'Sat',
-                          'Sun',
-                        ];
-                        if (value.toInt() < days.length) {
+                        final index = value.toInt();
+                        if (index >= 0 && index < labelSeries.length) {
                           return Text(
-                            days[value.toInt()],
-                            style: AppConstants.bodySmall.copyWith(
-                              fontSize: 10,
-                            ),
+                            dateFormatter.format(labelSeries[index].date),
+                            style: AppConstants.bodySmall.copyWith(fontSize: 10),
                           );
                         }
                         return const Text('');
@@ -2141,15 +2189,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                 lineBarsData: [
                   // Actual Sales - mirroring Historical Sales Trend
                   LineChartBarData(
-                    spots: [
-                      const FlSpot(0, 8500),
-                      const FlSpot(1, 10200),
-                      const FlSpot(2, 9800),
-                      const FlSpot(3, 12500),
-                      const FlSpot(4, 15200),
-                      const FlSpot(5, 14800),
-                      const FlSpot(6, 16500),
-                    ],
+                    spots: spotsActual,
                     isCurved: true,
                     color: AppConstants.successGreen,
                     barWidth: 3,
@@ -2158,15 +2198,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   ),
                   // Projected Sales
                   LineChartBarData(
-                    spots: [
-                      const FlSpot(0, 8200),
-                      const FlSpot(1, 9900),
-                      const FlSpot(2, 10500),
-                      const FlSpot(3, 12200),
-                      const FlSpot(4, 15600),
-                      const FlSpot(5, 15200),
-                      const FlSpot(6, 17200),
-                    ],
+                    spots: spotsProjected,
                     isCurved: true,
                     color: AppConstants.primaryOrange,
                     barWidth: 3,
@@ -2188,6 +2220,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
   /// Forecast Accuracy Card
   Widget _buildForecastAccuracyCard() {
+    final overallPercent = (_forecastOverallAccuracy * 100).clamp(0, 100);
+    final overallBar = _forecastOverallAccuracy.clamp(0.0, 1.0).toDouble();
+    final trendText = _formatDelta(_forecastAccuracyTrend);
+    final trendColor = _deltaColor(_forecastAccuracyTrend);
+    final recentPercent = (_forecastRecentAccuracy * 100).clamp(0, 100);
+    final recentBar = _forecastRecentAccuracy.clamp(0.0, 1.0).toDouble();
+    final salesPercent = (_forecastOverallAccuracy * 100).clamp(0, 100);
+    final trafficPercent = (_forecastTrafficAccuracy * 100).clamp(0, 100);
+    final peakPercent = (_forecastPeakAccuracy * 100).clamp(0, 100);
+
     return Container(
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       decoration: BoxDecoration(
@@ -2225,35 +2267,36 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                     Row(
                       children: [
                         Text(
-                          '87.3%',
+                          '${overallPercent.toStringAsFixed(1)}%',
                           style: AppConstants.headingMedium.copyWith(
                             color: AppConstants.successGreen,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppConstants.successGreen.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '+2.1%',
-                            style: AppConstants.bodySmall.copyWith(
-                              color: AppConstants.successGreen,
-                              fontWeight: FontWeight.bold,
+                        if (trendText != null)
+                          Container(
+                            margin: const EdgeInsets.only(left: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: trendColor.withOpacity(0.18),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              trendText,
+                              style: AppConstants.bodySmall.copyWith(
+                                color: trendColor,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
                     LinearProgressIndicator(
-                      value: 0.873,
+                      value: overallBar,
                       backgroundColor: AppConstants.dividerColor,
                       valueColor: AlwaysStoppedAnimation<Color>(
                         AppConstants.successGreen,
@@ -2268,14 +2311,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Last 7 Days',
+                      'Recent Fit',
                       style: AppConstants.bodySmall.copyWith(
                         color: AppConstants.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '92.1%',
+                      '${recentPercent.toStringAsFixed(1)}%',
                       style: AppConstants.headingMedium.copyWith(
                         color: AppConstants.successGreen,
                         fontWeight: FontWeight.bold,
@@ -2283,7 +2326,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                     ),
                     const SizedBox(height: 8),
                     LinearProgressIndicator(
-                      value: 0.921,
+                      value: recentBar,
                       backgroundColor: AppConstants.dividerColor,
                       valueColor: AlwaysStoppedAnimation<Color>(
                         AppConstants.successGreen,
@@ -2300,11 +2343,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildAccuracyMetric('Sales', '89%', AppConstants.primaryOrange),
-              _buildAccuracyMetric('Traffic', '91%', Colors.blue),
+              _buildAccuracyMetric(
+                'Sales',
+                '${salesPercent.toStringAsFixed(0)}%',
+                AppConstants.primaryOrange,
+              ),
+              _buildAccuracyMetric(
+                'Traffic',
+                '${trafficPercent.toStringAsFixed(0)}%',
+                Colors.blue,
+              ),
               _buildAccuracyMetric(
                 'Peak Hours',
-                '85%',
+                '${peakPercent.toStringAsFixed(0)}%',
                 AppConstants.warningYellow,
               ),
             ],
@@ -3101,60 +3152,50 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
   /// Inline AI Insights
   Widget _buildInlineInsights() {
-    final insights = [
-      {
-        'text':
-            'Schedule +2 servers for Saturday lunch (12-2PM). Expected 35% traffic increase.',
-        'action': 'View Schedule',
-        'icon': Icons.people,
-        'color': AppConstants.primaryOrange,
-        'priority': 'High',
-      },
-      {
-        'text':
-            'Order 30kg pasta by Thursday. Forecast shows 145 orders this weekend.',
-        'action': 'Update Inventory',
-        'icon': Icons.inventory_2,
-        'color': AppConstants.warningYellow,
-        'priority': 'High',
-      },
-      {
-        'text':
-            'Rain expected Friday. Promote comfort food combos - historically 22% sales boost.',
-        'action': 'Create Promo',
-        'icon': Icons.campaign,
-        'color': Colors.blue,
-        'priority': 'Medium',
-      },
-      {
-        'text':
-            'Dessert demand up 18% but stock low. Add Leche Flan to specials board.',
-        'action': 'Add to Menu',
-        'icon': Icons.cake,
-        'color': AppConstants.successGreen,
-        'priority': 'Medium',
-      },
-      {
-        'text':
-            'Monday typically slow. Run 20% lunch special to boost 11AM-1PM traffic.',
-        'action': 'Set Discount',
-        'icon': Icons.local_offer,
-        'color': Colors.purple,
-        'priority': 'Low',
-      },
-    ];
+    if (_forecastInsights.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppConstants.paddingMedium),
+        decoration: BoxDecoration(
+          color: AppConstants.cardBackground,
+          borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+          border: Border.all(color: AppConstants.dividerColor),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppConstants.primaryOrange.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.insights_outlined,
+                color: AppConstants.primaryOrange,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: AppConstants.paddingMedium),
+            Expanded(
+              child: Text(
+                'Run a forecast to surface staffing, inventory, and promo recommendations tailored to this range.',
+                style: AppConstants.bodyMedium.copyWith(
+                  color: AppConstants.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Column(
-      children: insights.map((insight) {
-        final priority = insight['priority'] as String;
-        Color priorityColor = AppConstants.textSecondary;
-        if (priority == 'High') {
-          priorityColor = AppConstants.errorRed;
-        } else if (priority == 'Medium') {
-          priorityColor = AppConstants.warningYellow;
-        }
-
-        final borderColor = priority == 'High'
+      children: _forecastInsights.map((insight) {
+        final visual = _insightVisualForKind(insight.kind);
+        final priorityColor = _priorityColor(insight.priority);
+        final priorityLabel = _priorityLabel(insight.priority);
+        final borderColor = insight.priority == _ForecastInsightPriority.high
             ? AppConstants.primaryOrange.withOpacity(0.5)
             : AppConstants.dividerColor;
 
@@ -3175,12 +3216,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: (insight['color'] as Color).withOpacity(0.15),
+                      color: visual.accentColor.withOpacity(0.18),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
-                      insight['icon'] as IconData,
-                      color: insight['color'] as Color,
+                      visual.icon,
+                      color: visual.accentColor,
                       size: 20,
                     ),
                   ),
@@ -3190,7 +3231,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          insight['text'] as String,
+                          insight.text,
                           style: AppConstants.bodyMedium.copyWith(
                             color: AppConstants.textPrimary,
                           ),
@@ -3206,7 +3247,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            'Priority: $priority',
+                            'Priority: $priorityLabel',
                             style: AppConstants.bodySmall.copyWith(
                               color: priorityColor,
                               fontWeight: FontWeight.bold,
@@ -3218,34 +3259,36 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   ),
                 ],
               ),
-              const SizedBox(height: AppConstants.paddingSmall),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          '${insight['action']} feature coming soon!',
+              if (insight.actionLabel != null) ...[
+                const SizedBox(height: AppConstants.paddingSmall),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '${insight.actionLabel} workflow coming soon!',
+                          ),
+                          backgroundColor: AppConstants.primaryOrange,
                         ),
-                        backgroundColor: AppConstants.primaryOrange,
-                      ),
-                    );
-                  },
-                  icon: Icon(
-                    Icons.arrow_forward,
-                    size: 16,
-                    color: AppConstants.primaryOrange,
-                  ),
-                  label: Text(
-                    insight['action'] as String,
-                    style: AppConstants.bodySmall.copyWith(
+                      );
+                    },
+                    icon: Icon(
+                      Icons.arrow_forward,
+                      size: 16,
                       color: AppConstants.primaryOrange,
-                      fontWeight: FontWeight.bold,
+                    ),
+                    label: Text(
+                      insight.actionLabel!,
+                      style: AppConstants.bodySmall.copyWith(
+                        color: AppConstants.primaryOrange,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ],
           ),
         );
@@ -4309,12 +4352,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
     try {
       final now = DateTime.now();
-      final forecastRange = Duration(days: _selectedRangeInDays());
-      final forecastsFuture = _forecastService.getSalesForecast(
-        startDate: now,
-        endDate: now.add(forecastRange),
-      );
-      final insightsFuture = _forecastService.getSalesInsights();
+      final rangeDays = _selectedRangeInDays();
       final transactionsFuture = _transactionService.fetchTransactions();
 
       final monthStart = DateTime(
@@ -4330,28 +4368,97 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
       final calendarFuture = _analyticsCalendarService.fetchMonth(
         _selectedCalendarMonth,
-        fallbackRangeDays: _selectedRangeInDays(),
+        fallbackRangeDays: rangeDays,
       );
       final impactsFuture = _analyticsCalendarService.fetchImpacts(
         start: monthStart,
         end: monthEnd,
-        fallbackRangeDays: _selectedRangeInDays(),
+        fallbackRangeDays: rangeDays,
       );
 
-      final forecasts = await forecastsFuture;
-      final insights = await insightsFuture;
+      final transactions = await transactionsFuture;
       final calendar = await calendarFuture;
       final impacts = await impactsFuture;
-      final transactions = await transactionsFuture;
       final analyticsSnapshot = _calculateHistoricalAnalytics(transactions);
+      final resolvedRange = _resolveActiveDateRange();
+
+      final categorySnapshots = analyticsSnapshot.categoryBreakdown
+          .map(
+            (category) => HistoricalCategorySnapshot(
+              name: category.name,
+              orders: category.quantity,
+              revenue: category.revenue,
+            ),
+          )
+          .toList();
+      final channelSnapshots = analyticsSnapshot.channelBreakdown
+          .map(
+            (channel) => HistoricalChannelSnapshot(
+              name: channel.name,
+              orders: channel.orders,
+              revenue: channel.revenue,
+              share: channel.share,
+              peakLabel: channel.peakLabel,
+            ),
+          )
+          .toList();
+      final topSellerSnapshots = analyticsSnapshot.topSellers
+          .map(
+            (seller) => HistoricalTopSellerSnapshot(
+              name: seller.name,
+              orders: seller.quantity,
+              revenue: seller.revenue,
+            ),
+          )
+          .toList();
+
+      final forecastResult = _forecastService.computeForecast(
+        startDate: now,
+        rangeDays: rangeDays,
+        transactions: transactions,
+        eventImpacts: impacts,
+        historicalRangeStart: resolvedRange.start,
+        historicalRangeEnd: resolvedRange.end,
+        historicalRevenue: analyticsSnapshot.totalRevenue,
+        historicalOrders: analyticsSnapshot.totalOrders,
+        historicalAverageOrderValue: analyticsSnapshot.averageOrderValue,
+        categories: categorySnapshots,
+        channels: channelSnapshots,
+        topSellers: topSellerSnapshots,
+      );
+
+      final insightResult = _generateForecastInsights(
+        forecastResult: forecastResult,
+        impacts: impacts,
+        categorySnapshots: categorySnapshots,
+        topSellerSnapshots: topSellerSnapshots,
+      );
 
       if (!mounted) {
         return;
       }
 
       setState(() {
-        _forecasts = forecasts;
-        _insights = insights;
+        _forecasts = forecastResult.forecasts;
+        _forecastProjectedSeries = forecastResult.projectedSeries;
+        _forecastActualSeries = forecastResult.actualSeries;
+        _forecastCategoryDemand = forecastResult.categoryDemand;
+        _forecastChannelDemand = forecastResult.channelDemand;
+        _forecastMenuPredictions = forecastResult.menuPredictions;
+        _forecastTotalRevenue = forecastResult.totalPredictedRevenue;
+        _forecastTotalOrders = forecastResult.totalPredictedOrders;
+        _forecastAverageOrderValue = forecastResult.averageOrderValue;
+        _forecastRevenueChangePercent = forecastResult.revenueChangePercent;
+        _forecastOrdersChangePercent = forecastResult.orderChangePercent;
+        _forecastAovChangePercent = forecastResult.aovChangePercent;
+        _forecastAverageConfidence = forecastResult.averageConfidence;
+        _forecastRecentAccuracy = forecastResult.recentAccuracy;
+        _forecastOverallAccuracy = forecastResult.salesAccuracy;
+        _forecastAccuracyTrend = forecastResult.accuracyTrend;
+        _forecastTrafficAccuracy = forecastResult.trafficAccuracy;
+        _forecastPeakAccuracy = forecastResult.peakAccuracy;
+        _forecastAction = insightResult.action;
+        _forecastInsights = insightResult.insights;
         _calendarMonth = calendar;
         _eventImpacts = impacts;
         _applyAnalyticsSnapshot(analyticsSnapshot);
@@ -4388,6 +4495,167 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       default:
         return 7;
     }
+  }
+
+  _ForecastInsightResult _generateForecastInsights({
+    required ForecastResult forecastResult,
+    required List<EventImpact> impacts,
+    required List<HistoricalCategorySnapshot> categorySnapshots,
+    required List<HistoricalTopSellerSnapshot> topSellerSnapshots,
+  }) {
+    final insights = <_ForecastInsight>[];
+    _ForecastActionRecommendation? action;
+
+    if (forecastResult.projectedSeries.isNotEmpty) {
+      final strongestDay = forecastResult.projectedSeries.reduce(
+        (a, b) => a.revenue >= b.revenue ? a : b,
+      );
+      final revenueLabel = Formatters.formatCurrency(strongestDay.revenue);
+      final dateLabel = DateFormat('EEE, MMM d').format(strongestDay.date);
+      insights.add(
+        _ForecastInsight(
+          text:
+              'Peak demand expected on $dateLabel with projected revenue of $revenueLabel. Staff 2 extra team members for lunch and dinner.',
+          priority: _ForecastInsightPriority.high,
+          kind: _ForecastInsightKind.staffing,
+          actionLabel: 'Adjust Staffing',
+        ),
+      );
+      action ??= _ForecastActionRecommendation(
+        title: 'Boost staffing on $dateLabel',
+        subtitle: 'Forecast peak ~ $revenueLabel. Add coverage for 11AM-2PM & 6-9PM.',
+        kind: _ForecastInsightKind.staffing,
+        priority: _ForecastInsightPriority.high,
+      );
+    }
+
+    final upcomingImpacts = impacts
+      .where((impact) => _isWithinSelectedForecastRange(impact.date))
+        .where((impact) => (impact.impactPercent ?? 0).abs() >= 6)
+        .toList()
+      ..sort(
+        (a, b) => (b.impactPercent ?? 0).abs().compareTo(
+          (a.impactPercent ?? 0).abs(),
+        ),
+      );
+
+    if (upcomingImpacts.isNotEmpty) {
+      final leadImpact = upcomingImpacts.first;
+      final dateLabel = DateFormat('EEE, MMM d').format(leadImpact.date);
+      final percentLabel = _formatDelta(leadImpact.impactPercent) ?? '0%';
+      final isPositive = (leadImpact.impactPercent ?? 0) >= 0;
+      final insightText = isPositive
+          ? 'Expect a $percentLabel lift on $dateLabel due to ${leadImpact.eventName}. Promote bundles and prep popular items early.'
+          : '$percentLabel headwind on $dateLabel from ${leadImpact.eventName}. Prepare delivery promos and keep comfort food ready.';
+      insights.add(
+        _ForecastInsight(
+          text: insightText,
+          priority:
+              isPositive ? _ForecastInsightPriority.high : _ForecastInsightPriority.high,
+          kind: isPositive
+              ? _ForecastInsightKind.inventory
+              : _ForecastInsightKind.promo,
+          actionLabel: isPositive ? 'Plan Specials' : 'Launch Promo',
+        ),
+      );
+      action ??= _ForecastActionRecommendation(
+        title: isPositive
+            ? 'Prep for ${leadImpact.eventName}'
+            : 'Mitigate ${leadImpact.eventName}',
+        subtitle: isPositive
+            ? 'Stock signature dishes before $dateLabel; forecast boost $percentLabel.'
+            : 'Schedule rainy-day offer for $dateLabel to offset $percentLabel dip.',
+        kind:
+            isPositive ? _ForecastInsightKind.inventory : _ForecastInsightKind.promo,
+        priority: _ForecastInsightPriority.high,
+      );
+    }
+
+    final categoryGrowth = forecastResult.categoryDemand
+        .where((category) => !category.changePercent.isNaN)
+        .toList()
+      ..sort((a, b) => b.changePercent.compareTo(a.changePercent));
+
+    if (categoryGrowth.isNotEmpty) {
+      final leader = categoryGrowth.first;
+      final changeLabel = _formatDelta(leader.changePercent) ?? '+0%';
+      insights.add(
+        _ForecastInsight(
+          text:
+              '${leader.name} demand projected at ${leader.predictedOrders} orders ($changeLabel). Ensure prep and line capacity by midday.',
+          priority: _ForecastInsightPriority.medium,
+          kind: _ForecastInsightKind.inventory,
+          actionLabel: 'Update Prep List',
+        ),
+      );
+      if (leader.changePercent > 0) {
+        action ??= _ForecastActionRecommendation(
+          title: 'Stock up ${leader.name}',
+          subtitle:
+              'Forecast ${leader.predictedOrders} orders ($changeLabel). Order ingredients ahead of weekend.',
+          kind: _ForecastInsightKind.inventory,
+          priority: _ForecastInsightPriority.medium,
+        );
+      }
+    }
+
+    final menuTrends = forecastResult.menuPredictions
+        .where((item) => item.status == MenuPredictionStatus.rising)
+        .toList()
+      ..sort((a, b) => b.changePercent.compareTo(a.changePercent));
+    if (menuTrends.isNotEmpty) {
+      final rising = menuTrends.first;
+      final changeLabel = _formatDelta(rising.changePercent) ?? '+0%';
+      insights.add(
+        _ForecastInsight(
+          text:
+              '${rising.name} projected at ${rising.predictedOrders} orders ($changeLabel). Feature it on the specials board.',
+          priority: _ForecastInsightPriority.medium,
+          kind: _ForecastInsightKind.promo,
+          actionLabel: 'Promote Item',
+        ),
+      );
+    } else if (forecastResult.menuPredictions.isNotEmpty) {
+      final declining = forecastResult.menuPredictions
+          .where((item) => item.status == MenuPredictionStatus.declining)
+          .toList();
+      if (declining.isNotEmpty) {
+        final item = declining.first;
+        final changeLabel = _formatDelta(item.changePercent) ?? '0%';
+        insights.add(
+          _ForecastInsight(
+            text:
+                '${item.name} may soften to ${item.predictedOrders} orders ($changeLabel). Consider a combo to lift interest.',
+            priority: _ForecastInsightPriority.low,
+            kind: _ForecastInsightKind.promo,
+            actionLabel: 'Create Combo',
+          ),
+        );
+      }
+    }
+
+    if (insights.isEmpty) {
+      insights.add(
+        const _ForecastInsight(
+          text: 'Forecast ready. Use the calendar and demand widgets to tailor staffing and promos.',
+          priority: _ForecastInsightPriority.low,
+          kind: _ForecastInsightKind.general,
+        ),
+      );
+    }
+
+    action ??= _ForecastActionRecommendation(
+      title: 'Refresh weekend prep list',
+      subtitle:
+          'Forecast totals exceed historical average. Align staffing, mise en place, and promos to capture demand.',
+      kind: _ForecastInsightKind.general,
+      priority: _ForecastInsightPriority.medium,
+    );
+
+    return _ForecastInsightResult(
+      action: action!,
+      insights: List<_ForecastInsight>.unmodifiable(insights),
+    );
   }
 
   bool _isWithinSelectedForecastRange(DateTime date) {
@@ -4863,6 +5131,67 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     return '$sign${percent.toStringAsFixed(precision)}%';
   }
 
+  Color _deltaColor(double? percent) {
+    if (percent == null || percent.isNaN || percent.abs() < 0.05) {
+      return AppConstants.textSecondary;
+    }
+    if (percent > 0) {
+      return AppConstants.successGreen;
+    }
+    if (percent < 0) {
+      return AppConstants.errorRed;
+    }
+    return AppConstants.textSecondary;
+  }
+
+  Color _priorityColor(_ForecastInsightPriority priority) {
+    switch (priority) {
+      case _ForecastInsightPriority.high:
+        return AppConstants.errorRed;
+      case _ForecastInsightPriority.medium:
+        return AppConstants.warningYellow;
+      case _ForecastInsightPriority.low:
+        return AppConstants.textSecondary;
+    }
+  }
+
+  String _priorityLabel(_ForecastInsightPriority priority) {
+    switch (priority) {
+      case _ForecastInsightPriority.high:
+        return 'High';
+      case _ForecastInsightPriority.medium:
+        return 'Medium';
+      case _ForecastInsightPriority.low:
+        return 'Low';
+    }
+  }
+
+  _ForecastInsightVisual _insightVisualForKind(_ForecastInsightKind kind) {
+    switch (kind) {
+      case _ForecastInsightKind.staffing:
+        return const _ForecastInsightVisual(
+          icon: Icons.people_alt,
+          accentColor: AppConstants.primaryOrange,
+        );
+      case _ForecastInsightKind.inventory:
+        return const _ForecastInsightVisual(
+          icon: Icons.inventory_2,
+          accentColor: AppConstants.successGreen,
+        );
+      case _ForecastInsightKind.promo:
+        return const _ForecastInsightVisual(
+          icon: Icons.campaign,
+          accentColor: Colors.lightBlue,
+        );
+      case _ForecastInsightKind.general:
+      default:
+        return const _ForecastInsightVisual(
+          icon: Icons.insights,
+          accentColor: AppConstants.primaryOrange,
+        );
+    }
+  }
+
   String _formatHourLabel(int hour) {
     final time = DateTime(0, 1, 1, hour);
     return DateFormat('h a').format(time);
@@ -5140,4 +5469,65 @@ class _ChannelAccumulator {
   double bestSlotValue = 0;
   int? bestHour;
   int? bestDayIndex;
+}
+
+enum _ForecastInsightPriority {
+  low,
+  medium,
+  high,
+}
+
+enum _ForecastInsightKind {
+  general,
+  staffing,
+  inventory,
+  promo,
+}
+
+class _ForecastInsight {
+  const _ForecastInsight({
+    required this.text,
+    required this.priority,
+    required this.kind,
+    this.actionLabel,
+  });
+
+  final String text;
+  final _ForecastInsightPriority priority;
+  final _ForecastInsightKind kind;
+  final String? actionLabel;
+}
+
+class _ForecastActionRecommendation {
+  const _ForecastActionRecommendation({
+    required this.title,
+    required this.subtitle,
+    required this.kind,
+    required this.priority,
+  });
+
+  final String title;
+  final String subtitle;
+  final _ForecastInsightKind kind;
+  final _ForecastInsightPriority priority;
+}
+
+class _ForecastInsightResult {
+  const _ForecastInsightResult({
+    required this.action,
+    required this.insights,
+  });
+
+  final _ForecastActionRecommendation action;
+  final List<_ForecastInsight> insights;
+}
+
+class _ForecastInsightVisual {
+  const _ForecastInsightVisual({
+    required this.icon,
+    required this.accentColor,
+  });
+
+  final IconData icon;
+  final Color accentColor;
 }
