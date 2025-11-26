@@ -64,7 +64,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
     });
   }
 
-  static final RegExp _menuIdPattern = RegExp(r'^MENU\d{3,}$');
+  static final RegExp _menuIdPattern = RegExp(r'^MENU\d{3,}₱');
 
   bool _isValidMenuId(String id) => _menuIdPattern.hasMatch(id);
 
@@ -84,7 +84,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
         await _menuService.normalizeMenuItemId(item);
       }
     } catch (e) {
-      print('Error normalizing menu item IDs: $e');
+      print('Error normalizing menu item IDs: ₱e');
     } finally {
       _isNormalizingIds = false;
     }
@@ -676,7 +676,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                     labelStyle: AppConstants.bodyMedium.copyWith(
                       color: AppConstants.textSecondary,
                     ),
-                    prefixText: '\$ ',
+                    prefixText: '\₱ ',
                     filled: true,
                     fillColor: AppConstants.darkSecondary,
                     border: OutlineInputBorder(
@@ -764,7 +764,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                   messenger.showSnackBar(
                     SnackBar(
                       content: Text(result['success']
-                          ? '${nameController.text.trim()} added successfully'
+                          ? '₱{nameController.text.trim()} added successfully'
                           : result['error']),
                       backgroundColor: result['success']
                           ? AppConstants.successGreen
@@ -774,7 +774,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                 } catch (e) {
                   messenger.showSnackBar(
                     SnackBar(
-                      content: Text('Failed to add item: $e'),
+                      content: Text('Failed to add item: ₱e'),
                       backgroundColor: AppConstants.errorRed,
                     ),
                   );
@@ -869,7 +869,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                     labelStyle: AppConstants.bodyMedium.copyWith(
                       color: AppConstants.textSecondary,
                     ),
-                    prefixText: '\$ ',
+                    prefixText: '\₱ ',
                     filled: true,
                     fillColor: AppConstants.darkSecondary,
                     border: OutlineInputBorder(
@@ -955,7 +955,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                 messenger.showSnackBar(
                   SnackBar(
                     content: Text(result['success']
-                        ? '${nameController.text.trim()} updated successfully'
+                        ? '₱{nameController.text.trim()} updated successfully'
                         : result['error']),
                     backgroundColor: result['success']
                         ? AppConstants.successGreen
@@ -991,7 +991,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
           ],
         ),
         content: Text(
-          'Are you sure you want to delete "${item.name}"? This action cannot be undone.',
+          'Are you sure you want to delete "₱{item.name}"? This action cannot be undone.',
           style: AppConstants.bodyMedium,
         ),
         actions: [
@@ -1012,7 +1012,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(result['success']
-                      ? '${item.name} deleted successfully'
+                      ? '₱{item.name} deleted successfully'
                       : result['error']),
                     backgroundColor: result['success']
                       ? AppConstants.errorRed
@@ -1176,7 +1176,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                 if (alreadyExists) {
                   messenger.showSnackBar(
                     SnackBar(
-                      content: Text('Category "$newLabel" already exists'),
+                      content: Text('Category "₱newLabel" already exists'),
                       backgroundColor: AppConstants.errorRed,
                     ),
                   );
@@ -1194,7 +1194,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                 Navigator.pop(context);
                 messenger.showSnackBar(
                   SnackBar(
-                    content: Text('Category "$newLabel" added successfully'),
+                    content: Text('Category "₱newLabel" added successfully'),
                     backgroundColor: AppConstants.successGreen,
                   ),
                 );

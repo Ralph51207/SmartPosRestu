@@ -24,56 +24,57 @@ class OrderItem {
   final String name;
   final int quantity;
   final double price;
-  final String? category;
-  final String? categoryLabel;
+  final double totalPrice;
+  final String? notes; // special instructions
+  final String? category; // e.g. "beverages"
+  final String? categoryLabel; // e.g. "Beverages"
 
   OrderItem({
     required this.id,
     required this.name,
     required this.quantity,
     required this.price,
+    required this.totalPrice,
+    this.notes,
     this.category,
     this.categoryLabel,
   });
 
-  double get totalPrice => price * quantity;
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'quantity': quantity,
-      'price': price,
-      'category': category,
-      'categoryLabel': categoryLabel,
-    };
+  // Helper: convert Map<dynamic,dynamic> -> Map<String,dynamic>
+  static Map<String, dynamic> _toStringKeyedMap(dynamic raw) {
+    if (raw == null) return <String, dynamic>{};
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) {
+      return raw.map((k, v) => MapEntry(k.toString(), v));
+    }
+    return <String, dynamic>{};
   }
 
-  factory OrderItem.fromJson(Map<dynamic, dynamic> json) {
-    final map = json is Map<String, dynamic>
-        ? json
-        : _stringKeyedMap(json);
-
-    final id = map['id']?.toString() ?? '';
-    final name = map['name']?.toString() ?? '';
-    final quantityValue = map['quantity'];
-    final quantity = quantityValue is int
-        ? quantityValue
-        : int.tryParse(quantityValue?.toString() ?? '') ?? 0;
-    final priceValue = map['price'];
-    final price = priceValue is num
-        ? priceValue.toDouble()
-        : double.tryParse(priceValue?.toString() ?? '0') ?? 0;
-
+  // Accept Map<dynamic,dynamic> snapshots safely
+  factory OrderItem.fromJson(dynamic raw) {
+    final json = _toStringKeyedMap(raw);
     return OrderItem(
-      id: id,
-      name: name,
-      quantity: quantity,
-      price: price,
-      category: map['category']?.toString(),
-      categoryLabel: map['categoryLabel']?.toString(),
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      quantity: (json['quantity'] is num) ? (json['quantity'] as num).toInt() : int.tryParse(json['quantity']?.toString() ?? '0') ?? 0,
+      price: (json['price'] is num) ? (json['price'] as num).toDouble() : double.tryParse(json['price']?.toString() ?? '0') ?? 0.0,
+      totalPrice: (json['totalPrice'] is num) ? (json['totalPrice'] as num).toDouble() : double.tryParse(json['totalPrice']?.toString() ?? '0') ?? 0.0,
+      notes: (json['notes']?.toString()),
+      category: json['category']?.toString(),
+      categoryLabel: json['categoryLabel']?.toString(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'quantity': quantity,
+        'price': price,
+        'totalPrice': totalPrice,
+        'notes': notes ?? '',
+        'category': category ?? '',
+        'categoryLabel': categoryLabel ?? '',
+      };
 }
 
 /// Order model

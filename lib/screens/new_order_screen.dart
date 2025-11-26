@@ -28,6 +28,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   StreamSubscription<List<MenuItem>>? _menuSubscription;
 
   final Map<String, int> _cart = {}; // itemId -> quantity
+  final Map<String, String> _itemNotes = {}; // itemId -> special instructions
   final List<MenuItem> _menuItems = [];
   String _searchQuery = '';
   bool _isLoading = true;
@@ -587,6 +588,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         onAdd: (quantity, notes) {
           setState(() {
             _cart[item.id] = quantity;
+            // store item-level note (may be empty)
+            _itemNotes[item.id] = (notes ?? '').toString();
           });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -675,8 +678,10 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           name: menuItem.name,
           quantity: quantity,
           price: menuItem.price,
-          category: menuItem.category.name,
-          categoryLabel: menuItem.categoryLabel,
+          totalPrice: (menuItem.price * quantity), // required
+          notes: (_itemNotes[itemId]?.trim().isEmpty ?? true) ? null : _itemNotes[itemId],
+          category: (menuItem.category is MenuCategory) ? (menuItem.category as MenuCategory).name : (menuItem.category?.toString()),
+          categoryLabel: menuItem.categoryLabel ?? ((menuItem.category is MenuCategory) ? (menuItem.category as MenuCategory).name : null),
         ),
       );
     });

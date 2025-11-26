@@ -28,15 +28,22 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
   bool _isLoadingOrders = true;
   String? _ordersError;
 
+  Timer? _midnightTimer;
+
+  bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
   @override
   void initState() {
     super.initState();
     _subscribeToOrders();
+    _scheduleMidnightTimer();
   }
 
   @override
   void dispose() {
     _ordersSubscription?.cancel();
+    _midnightTimer?.cancel();
     super.dispose();
   }
 
@@ -46,28 +53,42 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
       _ordersError = null;
     });
 
-    _ordersSubscription = _orderService.getOrdersStream().listen(
-      (orders) {
-        if (!mounted) {
-          return;
-        }
-        setState(() {
-          _orders
-            ..clear()
-            ..addAll(orders);
-          _isLoadingOrders = false;
-        });
-      },
-      onError: (error) {
-        if (!mounted) {
-          return;
-        }
-        setState(() {
-          _isLoadingOrders = false;
-          _ordersError = error.toString();
-        });
-      },
-    );
+    final todayStart = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+
+    _ordersSubscription = _orderService
+        .getOrdersStream(start: todayStart)
+        .listen((orders) {
+      if (!mounted) return;
+      setState(() {
+        _orders
+          ..clear()
+          ..addAll(orders);
+        _isLoadingOrders = false;
+      });
+    }, onError: (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingOrders = false;
+        _ordersError = error.toString();
+      });
+    });
+  }
+
+  void _scheduleMidnightTimer() {
+    _midnightTimer?.cancel();
+    final now = DateTime.now();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    final untilMidnight = tomorrow.difference(now);
+    _midnightTimer = Timer(untilMidnight, () {
+      if (!mounted) return;
+      // Clear today's list at midnight so the UI shows only orders from the new day.
+      setState(() {
+        _orders.clear();
+        _isLoadingOrders = false;
+      });
+      // Schedule again for the next day
+      _scheduleMidnightTimer();
+    });
   }
 
   Future<void> _changeOrderStatus(Order order, OrderStatus newStatus) async {
@@ -516,6 +537,27 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                       ),
                     ],
                   ),
+
+                  // Order-level note (optional)
+                  if ((order.notes ?? '').toString().trim().isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.note, size: 16, color: AppConstants.textSecondary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            order.notes.toString(),
+                            style: AppConstants.bodySmall.copyWith(
+                              color: AppConstants.textSecondary,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -532,6 +574,18 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                 itemCount: order.items.length,
                 itemBuilder: (context, index) {
                   final item = order.items[index];
+
+                  // Safely read item-level note: try `notes` then `note` on dynamic to avoid compile errors
+                  final String itemNote = (() {
+                    try {
+                      final d = item as dynamic;
+                      final n = d.notes ?? d.note;
+                      return n?.toString() ?? '';
+                    } catch (_) {
+                      return '';
+                    }
+                  })();
+
                   return Container(
                     margin: const EdgeInsets.only(
                       bottom: AppConstants.paddingSmall,
@@ -539,25 +593,43 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                     padding: const EdgeInsets.all(AppConstants.paddingSmall),
                     decoration: BoxDecoration(
                       color: AppConstants.darkSecondary,
-                      borderRadius: BorderRadius.circular(
-                        AppConstants.radiusSmall,
-                      ),
+                      borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            '${item.quantity}x ${item.name}',
-                            style: AppConstants.bodyMedium,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${item.quantity}x ${item.name}',
+                                style: AppConstants.bodyMedium,
+                              ),
+                            ),
+                            Text(
+                              Formatters.formatCurrency(item.totalPrice),
+                              style: AppConstants.bodyMedium.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          Formatters.formatCurrency(item.totalPrice),
-                          style: AppConstants.bodyMedium.copyWith(
-                            fontWeight: FontWeight.bold,
+
+                        // Item-level note (optional) — now using the model field
+                        if ((item.notes ?? '').trim().isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 4),
+                            child: Text(
+                              item.notes!,
+                              style: AppConstants.bodySmall.copyWith(
+                                color: AppConstants.textSecondary,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   );
@@ -1250,4 +1322,40 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
         return Icons.payment;
     }
   }
+}
+
+class OrderItem {
+  final String id;
+  final String name;
+  final int quantity;
+  final double price;
+  final double totalPrice;
+  final String? notes; // special instructions for this item
+
+  OrderItem({
+    required this.id,
+    required this.name,
+    required this.quantity,
+    required this.price,
+    required this.totalPrice,
+    this.notes,
+  });
+
+  factory OrderItem.fromJson(Map<String, dynamic> json) => OrderItem(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    quantity: (json['quantity'] as num).toInt(),
+    price: (json['price'] as num).toDouble(),
+    totalPrice: (json['totalPrice'] as num).toDouble(),
+    notes: (json['notes'] as String?) ?? '',
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'quantity': quantity,
+    'price': price,
+    'totalPrice': totalPrice,
+    'notes': notes ?? '',
+  };
 }

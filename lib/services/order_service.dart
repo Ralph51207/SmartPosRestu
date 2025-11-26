@@ -127,21 +127,25 @@ class OrderService {
   }
 
   /// Get orders stream (real-time updates)
-  Stream<List<Order>> getOrdersStream() {
-    return _ordersRef.onValue.map((event) {
-      final orders = <Order>[];
+  Stream<List<Order>> getOrdersStream({DateTime? start, DateTime? end}) {
+    // Use the instance-backed orders ref and keep timestamp filtering optional.
+    final startIso = (start ?? DateTime.now()).toIso8601String();
+    Query q = _ordersRef.orderByChild('timestamp').startAt(startIso);
+    if (end != null) {
+      q = q.endAt(end.toIso8601String());
+    }
+    return q.onValue.map((event) {
       final raw = event.snapshot.value;
+      if (raw == null) return <Order>[];
       if (raw is Map) {
-        raw.forEach((key, value) {
+        return raw.entries.map((e) {
+          final value = e.value;
           final map = _toStringKeyedMap(value);
-          if (map == null) {
-            return;
-          }
-          orders.add(Order.fromJson(map));
-        });
+          if (map == null) return null;
+          return Order.fromJson(map);
+        }).whereType<Order>().toList();
       }
-      orders.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-      return orders;
+      return <Order>[];
     });
   }
 
