@@ -209,6 +209,85 @@ class OrderService {
     }
   }
 
+  /// Atomically assign an order to a table and update both table and order nodes.
+  /// This performs a multi-location update so the table's `currentOrderId` and
+  /// status and the order's `tableNumber`/`tableId` are updated together.
+  Future<void> assignOrderToTableAtomic(String orderId, String tableId) async {
+    try {
+      // Fetch target table to obtain a human-facing table number (if present)
+      final tableSnap = await _databaseInstance.ref('tables/$tableId').get();
+      final tableMap = _toStringKeyedMap(tableSnap.value) ?? <String, dynamic>{};
+      final tableNumber = tableMap['tableNumber']?.toString() ?? '';
+
+      // Find any other table that currently references this order and clear it
+      final otherTablesSnap = await _databaseInstance
+          .ref('tables')
+          .orderByChild('currentOrderId')
+          .equalTo(orderId)
+          .get();
+
+      final updates = <String, dynamic>{};
+
+      if (otherTablesSnap.exists && otherTablesSnap.value is Map) {
+        final raw = otherTablesSnap.value as Map<dynamic, dynamic>;
+        raw.forEach((k, v) {
+          final otherId = k.toString();
+          if (otherId != tableId) {
+            updates['tables/$otherId/currentOrderId'] = null;
+            updates['tables/$otherId/status'] = 'free';
+          }
+        });
+      }
+
+      // Set the target table to reference this order
+      updates['tables/$tableId/currentOrderId'] = orderId;
+      updates['tables/$tableId/status'] = 'seated';
+
+      // Update the order with table info (tableNumber and optional tableId)
+      updates['orders/$orderId/tableNumber'] = tableNumber;
+      updates['orders/$orderId/tableId'] = tableId;
+
+      // Perform atomic multi-location update at root
+      await _databaseInstance.ref().update(updates);
+    } catch (e) {
+      print('Error assigning order to table atomically: $e');
+      rethrow;
+    }
+  }
+
+  /// Atomically detach/clear any table referencing the given orderId and
+  /// update the order to remove table association.
+  Future<void> detachOrderFromTableAtomic(String orderId) async {
+    try {
+      final updates = <String, dynamic>{};
+
+      // Find any table(s) that currently reference this order
+      final tablesSnap = await _databaseInstance
+          .ref('tables')
+          .orderByChild('currentOrderId')
+          .equalTo(orderId)
+          .get();
+
+      if (tablesSnap.exists && tablesSnap.value is Map) {
+        final raw = tablesSnap.value as Map<dynamic, dynamic>;
+        raw.forEach((k, v) {
+          final tableId = k.toString();
+          updates['tables/$tableId/currentOrderId'] = null;
+          updates['tables/$tableId/status'] = 'free';
+        });
+      }
+
+      // Remove table association from order
+      updates['orders/$orderId/tableNumber'] = 'NO_TABLE';
+      updates['orders/$orderId/tableId'] = null;
+
+      await _databaseInstance.ref().update(updates);
+    } catch (e) {
+      print('Error detaching order from table atomically: $e');
+      rethrow;
+    }
+  }
+
   /// Get orders by table number
   Future<List<Order>> getOrdersByTable(String tableNumber) async {
     try {

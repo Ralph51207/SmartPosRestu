@@ -48,10 +48,10 @@ class RestaurantTable {
     final capacity = capacityValue is int
         ? capacityValue
         : int.tryParse(capacityValue?.toString() ?? '') ?? 0;
-    final statusValue = map['status']?.toString() ?? 'available';
+    final statusValue = map['status']?.toString() ?? 'free';
     final status = TableStatus.values.firstWhere(
       (e) => e.toString().split('.').last == statusValue,
-      orElse: () => TableStatus.available,
+      orElse: () => TableStatus.free,
     );
     final currentOrderId = map['currentOrderId']?.toString();
 
@@ -84,8 +84,10 @@ class RestaurantTable {
 
 /// Table status enum
 enum TableStatus {
-  available,
-  occupied,
-  reserved,
-  cleaning,
+  free,
+  waiting,
+  seated,
+  ordering,
+  ready_for_payment,
+  occupied_cleaning,
 }

@@ -81,6 +81,7 @@ class OrderItem {
 class Order {
   final String id;
   final String tableNumber;
+  final String orderType; // 'dine_in' | 'takeout' | 'delivery' (empty if unspecified)
   final List<OrderItem> items;
   final double totalAmount;
   final DateTime timestamp;
@@ -91,6 +92,7 @@ class Order {
   Order({
     required this.id,
     required this.tableNumber,
+    this.orderType = '',
     required this.items,
     required this.totalAmount,
     required this.timestamp,
@@ -103,6 +105,7 @@ class Order {
     return {
       'id': id,
       'tableNumber': tableNumber,
+      'orderType': orderType,
       'items': items.map((item) => item.toJson()).toList(),
       'totalAmount': totalAmount,
       'timestamp': timestamp.toIso8601String(),
@@ -154,6 +157,8 @@ class Order {
     return Order(
       id: id,
       tableNumber: tableNumber,
+      // Do NOT infer orderType from tableNumber. Only use explicit value if present.
+      orderType: map['orderType']?.toString() ?? '',
       items: items,
       totalAmount: totalAmount,
       timestamp: timestamp,
@@ -165,6 +170,7 @@ class Order {
 
   Order copyWith({
     String? tableNumber,
+    String? orderType,
     List<OrderItem>? items,
     double? totalAmount,
     DateTime? timestamp,
@@ -175,6 +181,7 @@ class Order {
     return Order(
       id: id,
       tableNumber: tableNumber ?? this.tableNumber,
+      orderType: orderType ?? this.orderType,
       items: items != null ? List<OrderItem>.from(items) : List<OrderItem>.from(this.items),
       totalAmount: totalAmount ?? this.totalAmount,
       timestamp: timestamp ?? this.timestamp,

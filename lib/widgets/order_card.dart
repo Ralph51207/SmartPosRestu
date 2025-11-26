@@ -7,11 +7,13 @@ import '../utils/formatters.dart';
 class OrderCard extends StatelessWidget {
   final Order order;
   final VoidCallback onTap;
+  final void Function(String action)? onAction;
 
   const OrderCard({
     super.key,
     required this.order,
     required this.onTap,
+    this.onAction,
   });
 
   @override
@@ -59,7 +61,12 @@ class OrderCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  // Status badge
+                  // Open details (action list moved into details bottom sheet)
+                  IconButton(
+                    icon: const Icon(Icons.more_vert, color: AppConstants.textSecondary),
+                    onPressed: onTap,
+                  ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -86,21 +93,28 @@ class OrderCard extends StatelessWidget {
               const Divider(color: AppConstants.dividerColor, height: 1),
               const SizedBox(height: AppConstants.paddingSmall),
               
-              // Table and time info
+              // Table / Order type and time info
               Row(
                 children: [
-                  // Table number
-                  Icon(
-                    Icons.table_restaurant,
-                    color: AppConstants.textSecondary,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    tableLabel,
-                    style: AppConstants.bodyMedium,
-                  ),
-                  const SizedBox(width: AppConstants.paddingMedium),
+                  // If the order is takeout/delivery show the order type instead of table
+                  if (order.orderType == 'takeout' || order.orderType == 'delivery') ...[
+                    _buildOrderTypePlain(order.orderType),
+                    const SizedBox(width: AppConstants.paddingMedium),
+                  ] else ...[
+                    // Table number
+                    Icon(
+                      Icons.table_restaurant,
+                      color: AppConstants.textSecondary,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      tableLabel,
+                      style: AppConstants.bodyMedium,
+                    ),
+                    const SizedBox(width: AppConstants.paddingMedium),
+                  ],
+
                   // Time
                   Icon(
                     Icons.access_time,
@@ -172,5 +186,26 @@ class OrderCard extends StatelessWidget {
       case OrderStatus.cancelled:
         return 'CANCELLED';
     }
+  }
+
+  
+
+  Widget _buildOrderTypePlain(String type) {
+    final isTakeout = type == 'takeout';
+    final label = isTakeout ? 'Takeout' : 'Delivery';
+    final icon = isTakeout ? Icons.shopping_bag : Icons.delivery_dining;
+
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: AppConstants.textSecondary),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: AppConstants.bodyMedium.copyWith(
+            color: AppConstants.textSecondary,
+          ),
+        ),
+      ],
+    );
   }
 }

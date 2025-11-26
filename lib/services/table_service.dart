@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import '../models/table_model.dart';
+import 'order_service.dart';
 
 /// Firebase database service for table management
 /// Handles CRUD operations for restaurant tables
@@ -227,7 +228,7 @@ class TableService {
     try {
       await _tableRef(tableId).update({
         'currentOrderId': orderId,
-        'status': TableStatus.occupied.toString().split('.').last,
+        'status': TableStatus.seated.toString().split('.').last,
       });
     } catch (e) {
       print('Error assigning order to table: $e');
@@ -240,7 +241,9 @@ class TableService {
     if (table == null) {
       return;
     }
-    await assignOrderToTable(table.id, orderId);
+    // Prefer atomic assignment via OrderService to update both table and order together
+    final orderService = OrderService();
+    await orderService.assignOrderToTableAtomic(orderId, table.id);
   }
 
   /// Clear table (mark as available)
@@ -248,7 +251,7 @@ class TableService {
     try {
       await _tableRef(tableId).update({
         'currentOrderId': null,
-        'status': TableStatus.available.toString().split('.').last,
+        'status': TableStatus.free.toString().split('.').last,
       });
     } catch (e) {
       print('Error clearing table: $e');
@@ -261,7 +264,14 @@ class TableService {
     if (table == null) {
       return;
     }
-    await clearTable(table.id);
+    // If the table has an associated order, detach it atomically;
+    // otherwise clear the table status directly.
+    if (table.currentOrderId != null && table.currentOrderId!.isNotEmpty) {
+      final orderService = OrderService();
+      await orderService.detachOrderFromTableAtomic(table.currentOrderId!);
+    } else {
+      await clearTable(table.id);
+    }
   }
 
   /// Delete table
@@ -279,7 +289,7 @@ class TableService {
     try {
         final snapshot = await _tablesRef
           .orderByChild('status')
-          .equalTo(TableStatus.available.toString().split('.').last)
+          .equalTo(TableStatus.free.toString().split('.').last)
           .get();
 
       final tables = <RestaurantTable>[];

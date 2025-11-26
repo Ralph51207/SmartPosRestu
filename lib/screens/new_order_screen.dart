@@ -7,6 +7,7 @@ import '../models/order_model.dart';
 import '../services/menu_service.dart';
 import '../services/order_service.dart';
 import '../services/table_service.dart';
+import '../models/table_model.dart';
 import '../utils/constants.dart';
 import '../utils/formatters.dart';
 import '../widgets/add_item_bottom_sheet.dart';
@@ -715,6 +716,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       final order = Order(
         id: orderId,
         tableNumber: result.tableNumber,
+        orderType: result.orderType,
         items: items,
         totalAmount: totalAmount,
         timestamp: DateTime.now(),
@@ -727,7 +729,10 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
       if (order.tableNumber != 'NO_TABLE') {
         try {
-          await _tableService.assignOrderToTableByNumber(order.tableNumber, order.id);
+          final table = await _tableService.getTableByNumber(order.tableNumber);
+          if (table != null) {
+            await _orderService.assignOrderToTableAtomic(order.id, table.id);
+          }
         } catch (e) {
           // Surface warning but keep order creation successful
           ScaffoldMessenger.of(context).showSnackBar(
@@ -765,11 +770,13 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 class _CompleteOrderResult {
   const _CompleteOrderResult({
     required this.tableNumber,
+    required this.orderType,
     this.notes,
     required this.payNow,
   });
 
   final String tableNumber;
+  final String orderType;
   final String? notes;
   final bool payNow;
 }
@@ -808,18 +815,39 @@ class _CategoryFilter {
 
 class _CompleteOrderDialogState extends State<_CompleteOrderDialog> {
   String? _selectedTable;
+  // Order type: 'dine_in', 'takeout', 'delivery'
+  String _orderType = 'dine_in';
   final _notesController = TextEditingController();
   bool _payNow = true; // true = Pay Now, false = Pay Later
-  
-  final List<String> _availableTables = [
-    '1', '2', '3', '4', '5', '6', '7', '8', '9', '10',
-    '11', '12', '13', '14', '15'
-  ];
+  final TableService _tableService = TableService();
+  List<RestaurantTable> _tables = [];
+  StreamSubscription<List<RestaurantTable>>? _tablesSub;
 
   @override
   void dispose() {
     _notesController.dispose();
+    _tablesSub?.cancel();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // subscribe to tables stream so the picker reflects live table state
+    _tablesSub = _tableService.getTablesStream().listen((list) {
+      if (!mounted) return;
+      setState(() {
+        _tables = List<RestaurantTable>.from(list);
+        _tables.sort((a, b) {
+          final aNum = int.tryParse(a.tableNumber);
+          final bNum = int.tryParse(b.tableNumber);
+          if (aNum != null && bNum != null) return aNum.compareTo(bNum);
+          return a.tableNumber.compareTo(b.tableNumber);
+        });
+      });
+    }, onError: (_) {
+      // ignore errors for now
+    });
   }
 
   @override
@@ -905,86 +933,193 @@ class _CompleteOrderDialogState extends State<_CompleteOrderDialog> {
               ),
               const Divider(color: AppConstants.dividerColor),
 
-              // Table selection
-              const Text('Select Table', style: AppConstants.headingSmall),
+              // Order type selector (Dine-in / Takeout / Delivery)
+              const Text('Order Type', style: AppConstants.headingSmall),
               const SizedBox(height: AppConstants.paddingSmall),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              Row(
                 children: [
-                  // No Table option
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedTable = 'NO_TABLE';
-                      });
-                    },
-                    child: Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: _selectedTable == 'NO_TABLE'
-                            ? AppConstants.primaryOrange
-                            : AppConstants.darkSecondary,
-                        borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
-                        border: Border.all(
-                          color: _selectedTable == 'NO_TABLE'
-                              ? AppConstants.primaryOrange
-                              : AppConstants.dividerColor,
-                          width: 2,
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _orderType = 'dine_in';
+                          // require table selection when switching to dine-in
+                          _selectedTable = null;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _orderType == 'dine_in' ? AppConstants.primaryOrange : AppConstants.darkSecondary,
+                          borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+                          border: Border.all(
+                            color: _orderType == 'dine_in' ? AppConstants.primaryOrange : AppConstants.dividerColor,
+                            width: 2,
+                          ),
                         ),
-                      ),
-                      child: Center(
-                        child: Icon(
-                          Icons.block,
-                          color: _selectedTable == 'NO_TABLE'
-                              ? Colors.white
-                              : AppConstants.textSecondary,
-                          size: 28,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.restaurant, color: _orderType == 'dine_in' ? Colors.white : AppConstants.textSecondary),
+                            const SizedBox(width: 8),
+                            Text('Dine-in', style: AppConstants.bodyMedium.copyWith(color: _orderType == 'dine_in' ? Colors.white : AppConstants.textPrimary)),
+                          ],
                         ),
                       ),
                     ),
                   ),
-                  // Table numbers
-                  ..._availableTables.map((table) {
-                    final isSelected = _selectedTable == table;
-                    return GestureDetector(
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: GestureDetector(
                       onTap: () {
                         setState(() {
-                          _selectedTable = table;
+                          _orderType = 'takeout';
+                          // no table needed for takeout
+                          _selectedTable = 'NO_TABLE';
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _orderType == 'takeout' ? AppConstants.primaryOrange : AppConstants.darkSecondary,
+                          borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+                          border: Border.all(
+                            color: _orderType == 'takeout' ? AppConstants.primaryOrange : AppConstants.dividerColor,
+                            width: 2,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.shopping_bag, color: _orderType == 'takeout' ? Colors.white : AppConstants.textSecondary),
+                            const SizedBox(width: 8),
+                            Text('Takeout', style: AppConstants.bodyMedium.copyWith(color: _orderType == 'takeout' ? Colors.white : AppConstants.textPrimary)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _orderType = 'delivery';
+                          // no table needed for delivery
+                          _selectedTable = 'NO_TABLE';
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _orderType == 'delivery' ? AppConstants.primaryOrange : AppConstants.darkSecondary,
+                          borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+                          border: Border.all(
+                            color: _orderType == 'delivery' ? AppConstants.primaryOrange : AppConstants.dividerColor,
+                            width: 2,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.delivery_dining, color: _orderType == 'delivery' ? Colors.white : AppConstants.textSecondary),
+                            const SizedBox(width: 8),
+                            Text('Delivery', style: AppConstants.bodyMedium.copyWith(color: _orderType == 'delivery' ? Colors.white : AppConstants.textPrimary)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppConstants.paddingMedium),
+
+              // If dine-in, show table selection grid (live from TableService)
+              if (_orderType == 'dine_in') ...[
+                const Text('Select Table', style: AppConstants.headingSmall),
+                const SizedBox(height: AppConstants.paddingSmall),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    // No Table option
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedTable = 'NO_TABLE';
                         });
                       },
                       child: Container(
                         width: 50,
                         height: 50,
                         decoration: BoxDecoration(
-                          color: isSelected
+                          color: _selectedTable == 'NO_TABLE'
                               ? AppConstants.primaryOrange
                               : AppConstants.darkSecondary,
                           borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
                           border: Border.all(
-                            color: isSelected
+                            color: _selectedTable == 'NO_TABLE'
                                 ? AppConstants.primaryOrange
                                 : AppConstants.dividerColor,
                             width: 2,
                           ),
                         ),
                         child: Center(
-                          child: Text(
-                            table,
-                            style: AppConstants.bodyLarge.copyWith(
-                              color: isSelected
-                                  ? Colors.white
-                                  : AppConstants.textPrimary,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          child: Icon(
+                            Icons.block,
+                            color: _selectedTable == 'NO_TABLE'
+                                ? Colors.white
+                                : AppConstants.textSecondary,
+                            size: 28,
                           ),
                         ),
                       ),
-                    );
-                  }).toList(),
-                ],
-              ),
+                    ),
+                    // Live tables from the database
+                    ..._tables.map((t) {
+                      final isSelected = _selectedTable == t.tableNumber;
+                      final isOccupied = t.status != TableStatus.free || (t.currentOrderId?.isNotEmpty ?? false);
+                      return GestureDetector(
+                        onTap: isOccupied
+                            ? null
+                            : () {
+                                setState(() {
+                                  _selectedTable = t.tableNumber;
+                                });
+                              },
+                        child: Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? AppConstants.primaryOrange
+                                : (isOccupied ? AppConstants.darkSecondary.withOpacity(0.6) : AppConstants.darkSecondary),
+                            borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+                            border: Border.all(
+                              color: isSelected
+                                  ? AppConstants.primaryOrange
+                                  : (isOccupied ? AppConstants.dividerColor.withOpacity(0.6) : AppConstants.dividerColor),
+                              width: 2,
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              t.tableNumber,
+                              style: AppConstants.bodyLarge.copyWith(
+                                color: isSelected
+                                    ? Colors.white
+                                    : (isOccupied ? AppConstants.textSecondary.withOpacity(0.6) : AppConstants.textPrimary),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ],
+                ),
+                const SizedBox(height: AppConstants.paddingMedium),
+              ],
               const SizedBox(height: AppConstants.paddingMedium),
 
               // Payment options
@@ -1134,13 +1269,15 @@ class _CompleteOrderDialogState extends State<_CompleteOrderDialog> {
                   Expanded(
                     flex: 2,
                     child: ElevatedButton(
-                      onPressed: _selectedTable == null || widget.isSubmitting
+                      onPressed: (widget.isSubmitting || (_orderType == 'dine_in' && _selectedTable == null))
                           ? null
                           : () {
                               final trimmedNotes = _notesController.text.trim();
+                              final tableNumberResult = _orderType == 'dine_in' ? (_selectedTable ?? 'NO_TABLE') : 'NO_TABLE';
                               widget.onComplete(
                                 _CompleteOrderResult(
-                                  tableNumber: _selectedTable!,
+                                  tableNumber: tableNumberResult,
+                                  orderType: _orderType,
                                   notes: trimmedNotes.isEmpty ? null : trimmedNotes,
                                   payNow: _payNow,
                                 ),

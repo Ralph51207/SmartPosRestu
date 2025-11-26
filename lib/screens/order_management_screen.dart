@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/order_model.dart';
+import '../models/table_model.dart';
 import '../utils/constants.dart';
 import '../utils/formatters.dart';
 import '../widgets/order_card.dart';
+import '../widgets/table_card.dart';
 import '../services/order_service.dart';
 import '../services/table_service.dart';
 import '../services/transaction_service.dart';
@@ -257,7 +259,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
             ),
           ),
           // Status filters
-          ...OrderStatus.values.map((status) {
+            ...OrderStatus.values.where((s) => s != OrderStatus.preparing).map((status) {
             final isSelected = _selectedFilter == status;
             return Padding(
               padding: const EdgeInsets.only(right: AppConstants.paddingSmall),
@@ -377,12 +379,164 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       itemCount: filteredOrders.length,
       itemBuilder: (context, index) {
+        final order = filteredOrders[index];
         return OrderCard(
-          order: filteredOrders[index],
-          onTap: () => _showOrderDetails(filteredOrders[index]),
+          order: order,
+          onTap: () => _showOrderDetails(order),
+          onAction: (action) => _handleOrderQuickAction(order, action),
         );
       },
     );
+  }
+
+  Future<void> _handleOrderQuickAction(Order order, String action) async {
+    switch (action) {
+      case 'assign':
+        await _showCompactTablePicker(order, allowOccupied: false, mode: 'assign');
+        break;
+      case 'move':
+        await _showCompactTablePicker(order, allowOccupied: true, mode: 'move');
+        break;
+      case 'merge':
+        await _startMergeFlow(order);
+        break;
+      case 'seat':
+        await _seatStartOrder(order);
+        break;
+      case 'checkout':
+        _showCheckoutDialog(order);
+        break;
+      default:
+        break;
+    }
+  }
+
+  Future<void> _showCompactTablePicker(Order order, {bool allowOccupied = false, required String mode}) async {
+    // fetch current tables snapshot
+    final tables = await _tableService.getTablesStream().first;
+    // Sort tables by numeric tableNumber when possible so picker shows same sequence as main grid
+    final sortedTables = List<RestaurantTable>.from(tables);
+    sortedTables.sort((a, b) {
+      final aValue = int.tryParse(a.tableNumber);
+      final bValue = int.tryParse(b.tableNumber);
+      if (aValue != null && bValue != null) {
+        return aValue.compareTo(bValue);
+      }
+      return a.tableNumber.compareTo(b.tableNumber);
+    });
+    final candidates = allowOccupied ? sortedTables : sortedTables.where((t) => t.status == TableStatus.free).toList();
+
+    final picked = await showModalBottomSheet<RestaurantTable>(
+      context: context,
+      backgroundColor: AppConstants.cardBackground,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppConstants.radiusLarge))),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(AppConstants.paddingLarge),
+        child: GridView.builder(
+          shrinkWrap: true,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.68),
+          itemCount: candidates.length,
+          itemBuilder: (context, i) {
+            final t = candidates[i];
+            return InkWell(
+              onTap: () => Navigator.pop(context, t),
+              child: AspectRatio(
+                aspectRatio: 0.68,
+                child: TableCard(table: t, itemCount: 0, totalAmount: 0.0),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
+    if (picked == null) return;
+
+    try {
+      await _orderService.assignOrderToTableAtomic(order.id, picked.id);
+      await _orderService.updateOrder(order.copyWith(tableNumber: picked.tableNumber));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Order ${order.id} ${mode == 'move' ? 'moved' : 'assigned'} to Table ${picked.tableNumber}')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to assign table: $e')));
+    }
+  }
+
+  Future<void> _startMergeFlow(Order order) async {
+    // pick a target table that has an order
+    final tables = await _tableService.getTablesStream().first;
+    final sorted = List<RestaurantTable>.from(tables);
+    sorted.sort((a, b) {
+      final aValue = int.tryParse(a.tableNumber);
+      final bValue = int.tryParse(b.tableNumber);
+      if (aValue != null && bValue != null) {
+        return aValue.compareTo(bValue);
+      }
+      return a.tableNumber.compareTo(b.tableNumber);
+    });
+    final occupiedTables = sorted.where((t) => t.currentOrderId != null && t.currentOrderId!.isNotEmpty).toList();
+    final picked = await showModalBottomSheet<RestaurantTable>(
+      context: context,
+      backgroundColor: AppConstants.cardBackground,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(AppConstants.paddingLarge),
+        child: ListView.builder(
+          shrinkWrap: true,
+          itemCount: occupiedTables.length,
+          itemBuilder: (context, i) {
+            final t = occupiedTables[i];
+            return ListTile(
+              title: Text('Table ${t.tableNumber}'),
+              subtitle: Text('${t.currentOrderId}'),
+              onTap: () => Navigator.pop(context, t),
+            );
+          },
+        ),
+      ),
+    );
+
+    if (picked == null) return;
+
+    final targetOrderId = picked.currentOrderId;
+    if (targetOrderId == null || targetOrderId.isEmpty) return;
+    try {
+      final targetOrder = await _orderService.getOrder(targetOrderId);
+      if (targetOrder == null) throw 'Target order not found';
+
+      // Merge items (simple append) and totals
+      final mergedItems = <dynamic>[];
+      mergedItems.addAll(targetOrder.items);
+      mergedItems.addAll(order.items);
+      final mergedTotal = mergedItems.fold<double>(0, (s, it) => s + ((it.totalPrice is num) ? (it.totalPrice as num).toDouble() : double.tryParse(it.totalPrice?.toString() ?? '0') ?? 0));
+
+      final updatedTarget = targetOrder.copyWith(items: mergedItems.cast(), totalAmount: mergedTotal);
+
+      await _orderService.updateOrder(updatedTarget);
+      // remove source order and clear its table references
+      await _orderService.deleteOrder(order.id);
+      await _orderService.detachOrderFromTableAtomic(order.id);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Merged Order ${order.id} into ${targetOrder.id}')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Merge failed: $e')));
+    }
+  }
+
+  Future<void> _seatStartOrder(Order order) async {
+    try {
+      if (order.tableNumber.trim().isEmpty || order.tableNumber == 'NO_TABLE') {
+        await _showCompactTablePicker(order, allowOccupied: false, mode: 'seat');
+      }
+      await _orderService.updateOrderStatus(order.id, OrderStatus.preparing);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Order ${order.id} started')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to start order: $e')));
+    }
   }
 
   int _statusSortPriority(OrderStatus status) {
@@ -392,7 +546,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
       case OrderStatus.ready:
         return 1;
       case OrderStatus.preparing:
-        return 2;
+        // Treat preparing like pending in the order list (hidden as a separate tab)
+        return 0;
       case OrderStatus.completed:
         return 3;
       case OrderStatus.cancelled:
@@ -423,8 +578,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                 Navigator.pop(context);
               },
             ),
-            // Status options
-            ...OrderStatus.values.map((status) {
+            // Status options (exclude preparing state from this UI)
+            ...OrderStatus.values.where((s) => s != OrderStatus.preparing).map((status) {
               return RadioListTile<OrderStatus?>(
                 title: Text(
                   status.toString().split('.').last.toUpperCase(),
@@ -474,6 +629,52 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: AppConstants.paddingSmall),
+            // Action list moved here: Assign / Move / Merge / Seat / Checkout
+            Container(
+              decoration: BoxDecoration(
+                color: AppConstants.darkSecondary,
+                borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.assignment, color: AppConstants.textPrimary),
+                    title: const Text('Assign to table'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showCompactTablePicker(order, allowOccupied: false, mode: 'assign');
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.open_with, color: AppConstants.textPrimary),
+                    title: const Text('Move to table'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showCompactTablePicker(order, allowOccupied: true, mode: 'move');
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.merge_type, color: AppConstants.textPrimary),
+                    title: const Text('Merge with table'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _startMergeFlow(order);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.event_seat, color: AppConstants.textPrimary),
+                    title: const Text('Seat / Start order'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _seatStartOrder(order);
+                    },
+                  ),
+                  // Checkout action intentionally removed from quick-actions list
+                ],
+              ),
+            ),
             const SizedBox(height: AppConstants.paddingMedium),
 
             // Order Info
@@ -489,12 +690,15 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Table:', style: AppConstants.bodyMedium),
-                      Text(
-                        _formatTableLabel(order.tableNumber),
-                        style: AppConstants.bodyLarge.copyWith(
-                          fontWeight: FontWeight.bold,
+                        Text(
+                          // If orderType indicates takeout/delivery, show that instead of a table label
+                          (order is dynamic && (order.orderType == 'takeout' || order.orderType == 'delivery'))
+                              ? (order.orderType == 'takeout' ? 'Takeout' : 'Delivery')
+                              : _formatTableLabel(order.tableNumber),
+                          style: AppConstants.bodyLarge.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -727,7 +931,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
       case OrderStatus.pending:
         return AppConstants.warningYellow;
       case OrderStatus.preparing:
-        return Colors.blue;
+        // Map preparing to pending color so the UI doesn't expose a separate preparing state
+        return AppConstants.warningYellow;
       case OrderStatus.ready:
         return AppConstants.primaryOrange;
       case OrderStatus.completed:
@@ -1104,10 +1309,13 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
     if (result['success']) {
       String? tableError;
       try {
-        await _orderService.updateOrderStatus(order.id, OrderStatus.completed);
+        // Ensure order record (including orderType) is persisted when completing
+        await _orderService.updateOrder(order);
         if (_shouldReleaseTable(order, OrderStatus.completed)) {
           tableError = await _clearTableForOrder(order);
         }
+        // Also update status field explicitly to keep parity with other flows
+        await _orderService.updateOrderStatus(order.id, OrderStatus.completed);
       } catch (e) {
         if (!mounted) {
           return;
@@ -1298,7 +1506,8 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
       return null;
     }
     try {
-      await _tableService.clearTableByNumber(order.tableNumber);
+      // Use atomic detach helper to clear any table referencing this order
+      await _orderService.detachOrderFromTableAtomic(order.id);
       return null;
     } catch (e) {
       return e.toString();
