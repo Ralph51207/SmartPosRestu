@@ -21,7 +21,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final TransactionService _transactionService = TransactionService();
   final NumberFormat _countFormatter = NumberFormat.decimalPattern();
 
-  String _selectedPeriod = 'Daily';
+  String _selectedPeriod = 'Timely';
   bool _isLoading = true;
   String? _error;
 
@@ -290,9 +290,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 child: Row(
                   children: [
+                    _buildPeriodButton('Timely'),
                     _buildPeriodButton('Daily'),
                     _buildPeriodButton('Weekly'),
-                    _buildPeriodButton('Monthly'),
                   ],
                 ),
               ),
@@ -361,12 +361,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return LineChart(
       LineChartData(
+        clipData: FlClipData.all(),
         maxY: maxY,
         minY: 0.0,
         gridData: FlGridData(
           show: true,
           drawVerticalLine: true,
-          horizontalInterval: interval,
+          // densify horizontal lines
+          horizontalInterval: interval > 1 ? (interval / 2) : interval,
           verticalInterval: 1,
           getDrawingHorizontalLine: (value) {
             return FlLine(
@@ -400,7 +402,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: Text(
-                    '₱${value.toInt()}',
+                    Formatters.formatCurrencyNoCents(value),
                     style: AppConstants.bodySmall.copyWith(fontSize: 10),
                     textAlign: TextAlign.right,
                   ),
@@ -413,13 +415,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
               showTitles: true,
               interval: 1,
               getTitlesWidget: (value, meta) {
-                if (value.toInt() < labels.length) {
-                  return Text(
-                    labels[value.toInt()],
-                    style: AppConstants.bodySmall,
-                  );
-                }
-                return const SizedBox.shrink();
+                // Reduce horizontal label density: show up to ~6 labels evenly spaced
+                final int count = labels.length;
+                if (count == 0) return const SizedBox.shrink();
+                final int maxLabels = 6;
+                final int step = (count <= maxLabels) ? 1 : ( (count / maxLabels).ceil() );
+                final int idx = value.toInt();
+                if (idx < 0 || idx >= count) return const SizedBox.shrink();
+                if (idx % step != 0) return const SizedBox.shrink();
+                return Text(
+                  labels[idx],
+                  style: AppConstants.bodySmall,
+                );
               },
             ),
           ),
@@ -427,8 +434,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         borderData: FlBorderData(show: false),
         lineBarsData: [
           LineChartBarData(
-            spots: spots,
+            spots: _sanitizeSpots(spots),
             isCurved: true,
+            preventCurveOverShooting: true,
+            curveSmoothness: 0.15,
             color: AppConstants.primaryOrange,
             barWidth: 3,
             dotData: FlDotData(show: true),
@@ -638,9 +647,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final customerChange = _percentChange(todayCustomers.toDouble(), yesterdayCustomers.toDouble());
 
       final chartData = <String, _ChartSeries>{
-        'Daily': _buildDailySeries(todayTxns),
-        'Weekly': _buildWeeklySeries(weekTxns, weekStart),
-        'Monthly': _buildMonthlySeries(monthTxns, monthStart),
+        // 'Timely' shows intra-day buckets (previously 'Daily')
+        'Timely': _buildDailySeries(todayTxns),
+        // 'Daily' shows day-by-day totals for the week (previously 'Weekly')
+        'Daily': _buildWeeklySeries(weekTxns, weekStart),
+        // 'Weekly' shows week-by-week totals for the month (previously 'Monthly')
+        'Weekly': _buildMonthlySeries(monthTxns, monthStart),
       };
 
       final topItems = _computeTopItems(weekTxns);
@@ -693,7 +705,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   _ChartSeries _buildDailySeries(List<TransactionRecord> records) {
-    const bucketCount = 6;
+    // Increase intra-day buckets so the x-axis shows more time points
+    // e.g. 12 buckets -> every 2 hours
+    const bucketCount = 12;
     final bucketTotals = List<double>.filled(bucketCount, 0.0);
     const bucketSize = 24 / bucketCount;
     for (final txn in records) {
@@ -718,7 +732,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
 
     final maxValue = bucketTotals.fold<double>(0.0, (prev, value) => value > prev ? value : prev);
-    final maxY = _niceCeiling(maxValue);
+    final maxY = _niceCeiling(maxValue * 1.1);
     return _ChartSeries(
       spots: spots,
       labels: labels,
@@ -747,7 +761,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
 
     final maxValue = totals.fold<double>(0.0, (prev, value) => value > prev ? value : prev);
-    final maxY = _niceCeiling(maxValue);
+    final maxY = _niceCeiling(maxValue * 1.1);
     return _ChartSeries(
       spots: spots,
       labels: labels,
@@ -772,7 +786,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       (index) => FlSpot(index.toDouble(), totals[index]),
     );
     final maxValue = totals.fold<double>(0.0, (prev, value) => value > prev ? value : prev);
-    final maxY = _niceCeiling(maxValue);
+    final maxY = _niceCeiling(maxValue * 1.1);
     return _ChartSeries(
       spots: spots,
       labels: labels,
@@ -921,6 +935,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     final interval = niceNormalized * magnitude;
     return interval <= 0 ? 1.0 : interval;
+  }
+
+  /// Ensure FlSpots are sorted and valid to prevent visual artifacts.
+  List<FlSpot> _sanitizeSpots(List<FlSpot> spots) {
+    final filtered = spots.where((s) => s.x.isFinite && s.y.isFinite && !s.y.isNaN).toList();
+    filtered.sort((a, b) => a.x.compareTo(b.x));
+    return filtered;
   }
 
   double? _percentChange(double current, double previous) {

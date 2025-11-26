@@ -41,6 +41,22 @@ class Formatters {
     return number.toStringAsFixed(0);
   }
 
+  /// Format currency without decimal cents (for axis labels in charts)
+  static String formatCurrencyNoCents(double amount) {
+    final formatter = NumberFormat.currency(symbol: '₱', decimalDigits: 0);
+    return formatter.format(amount);
+  }
+
+  /// Compact number formatting without a decimal (e.g., 1K, 2M)
+  static String formatCompactNumberNoDecimal(double number) {
+    if (number >= 1000000) {
+      return '${(number / 1000000).toStringAsFixed(0)}M';
+    } else if (number >= 1000) {
+      return '${(number / 1000).toStringAsFixed(0)}K';
+    }
+    return number.toStringAsFixed(0);
+  }
+
   /// Format duration (e.g., "2h 30m")
   static String formatDuration(Duration duration) {
     final hours = duration.inHours;

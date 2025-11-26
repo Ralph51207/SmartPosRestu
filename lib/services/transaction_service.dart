@@ -8,6 +8,7 @@ class TransactionRecord {
   final String id;
   final String orderId;
   final String tableNumber;
+  final String? orderType;
   final double totalAmount;
   final double amountPaid;
   final double change;
@@ -22,6 +23,7 @@ class TransactionRecord {
     required this.id,
     required this.orderId,
     required this.tableNumber,
+    this.orderType,
     required this.totalAmount,
     required this.amountPaid,
     required this.change,
@@ -38,6 +40,7 @@ class TransactionRecord {
       'id': id,
       'orderId': orderId,
       'tableNumber': tableNumber,
+      'orderType': orderType,
       'totalAmount': totalAmount,
       'amountPaid': amountPaid,
       'change': change,
@@ -90,6 +93,10 @@ class TransactionRecord {
       id: json['id']?.toString() ?? '',
       orderId: json['orderId']?.toString() ?? '',
       tableNumber: json['tableNumber']?.toString() ?? 'NO_TABLE',
+      orderType: json['orderType']?.toString() ??
+        (json['metadata'] is Map && (json['metadata']['orderType'] != null)
+          ? json['metadata']['orderType'].toString()
+          : null),
       totalAmount: _asDouble(json['totalAmount']),
       amountPaid: _asDouble(json['amountPaid']),
       change: _asDouble(json['change']),
@@ -167,6 +174,7 @@ class TransactionService {
         id: order.id,
         orderId: order.id,
         tableNumber: order.tableNumber,
+        orderType: order.orderType,
         totalAmount: order.totalAmount,
         amountPaid: amountPaid,
         change: change,
