@@ -1463,55 +1463,79 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
   /// Demand Forecasting by Category
   Widget _buildCategoryDemandForecast() {
-    final categories = [
-      {
-        'name': 'Main Course',
-        'predicted': 340,
-        'historical': 280,
-        'change': '+21%',
-        'isIncrease': true,
-        'color': AppConstants.primaryOrange,
-        'icon': Icons.restaurant,
-      },
-      {
-        'name': 'Beverages',
-        'predicted': 210,
-        'historical': 178,
-        'change': '+18%',
-        'isIncrease': true,
-        'color': Colors.blue,
-        'icon': Icons.local_cafe,
-      },
-      {
-        'name': 'Appetizers',
-        'predicted': 120,
-        'historical': 105,
-        'change': '+14%',
-        'isIncrease': true,
-        'color': AppConstants.successGreen,
-        'icon': Icons.fastfood,
-      },
-      {
-        'name': 'Desserts',
-        'predicted': 85,
-        'historical': 78,
-        'change': '+9%',
-        'isIncrease': true,
-        'color': Colors.pink,
-        'icon': Icons.cake,
-      },
-      {
-        'name': 'Sides',
-        'predicted': 65,
-        'historical': 72,
-        'change': '-10%',
-        'isIncrease': false,
-        'color': AppConstants.warningYellow,
-        'icon': Icons.food_bank,
-      },
+    if (_forecastCategoryDemand.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(AppConstants.paddingMedium),
+        decoration: BoxDecoration(
+          color: AppConstants.cardBackground,
+          borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+          border: Border.all(color: AppConstants.dividerColor, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'No category projections yet',
+              style: AppConstants.bodyLarge,
+            ),
+            const SizedBox(height: AppConstants.paddingSmall),
+            Text(
+              'Run analytics with recent transactions to forecast category demand.',
+              style: AppConstants.bodySmall.copyWith(
+                color: AppConstants.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    const List<Color> palette = <Color>[
+      AppConstants.primaryOrange,
+      Colors.blue,
+      AppConstants.successGreen,
+      Colors.pink,
+      AppConstants.warningYellow,
+      Colors.purple,
+      Colors.teal,
     ];
 
-    final maxValue = 340;
+    final maxPredicted = _forecastCategoryDemand.fold<int>(
+      0,
+      (maxValue, item) => math.max(maxValue, item.predictedOrders),
+    );
+    final maxValue = maxPredicted == 0 ? 1 : maxPredicted;
+
+    Color _categoryColor(int index) =>
+        palette[index % palette.length];
+
+    IconData _categoryIcon(String name) {
+      final lower = name.toLowerCase();
+      if (lower.contains('drink') || lower.contains('bev')) {
+        return Icons.local_cafe;
+      }
+      if (lower.contains('dessert') || lower.contains('sweet')) {
+        return Icons.cake;
+      }
+      if (lower.contains('app') || lower.contains('starter')) {
+        return Icons.fastfood;
+      }
+      if (lower.contains('side')) {
+        return Icons.food_bank;
+      }
+      return Icons.restaurant;
+    }
+
+    String _changeLabel(double value) {
+      final formatted = _formatDelta(value);
+      if (formatted == null) {
+        return '0%';
+      }
+      if (formatted == 'New') {
+        return 'New';
+      }
+      return formatted;
+    }
 
     return Container(
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
@@ -1522,8 +1546,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       ),
       child: Column(
         children: [
-          ...categories.map((category) {
-            final percentage = (category['predicted'] as int) / maxValue;
+          ..._forecastCategoryDemand.asMap().entries.map((entry) {
+            final index = entry.key;
+            final category = entry.value;
+            final color = _categoryColor(index);
+            final changeLabel = _changeLabel(category.changePercent);
+            final isIncrease =
+                !category.changePercent.isNaN && category.changePercent >= 0;
+            final percentage = category.predictedOrders / maxValue;
+
             return Padding(
               padding: const EdgeInsets.only(
                 bottom: AppConstants.paddingMedium,
@@ -1536,12 +1567,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: (category['color'] as Color).withOpacity(0.2),
+                          color: color.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
-                          category['icon'] as IconData,
-                          color: category['color'] as Color,
+                          _categoryIcon(category.name),
+                          color: color,
                           size: 20,
                         ),
                       ),
@@ -1551,14 +1582,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              category['name'] as String,
+                              category.name,
                               style: AppConstants.bodyMedium.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Historical: ${category['historical']} orders',
+                              'Historical: ${category.historicalOrders} orders',
                               style: AppConstants.bodySmall.copyWith(
                                 color: AppConstants.textSecondary,
                               ),
@@ -1570,10 +1601,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            '${category['predicted']} orders',
+                            '${category.predictedOrders} orders',
                             style: AppConstants.bodyLarge.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: category['color'] as Color,
+                              color: color,
                             ),
                           ),
                           const SizedBox(height: 2),
@@ -1583,30 +1614,29 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color:
-                                  (category['isIncrease'] as bool
-                                          ? AppConstants.successGreen
-                                          : AppConstants.errorRed)
-                                      .withOpacity(0.2),
+                              color: (isIncrease
+                                      ? AppConstants.successGreen
+                                      : AppConstants.errorRed)
+                                  .withOpacity(0.2),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  category['isIncrease'] as bool
+                                  isIncrease
                                       ? Icons.arrow_upward
                                       : Icons.arrow_downward,
                                   size: 12,
-                                  color: category['isIncrease'] as bool
+                                  color: isIncrease
                                       ? AppConstants.successGreen
                                       : AppConstants.errorRed,
                                 ),
                                 const SizedBox(width: 2),
                                 Text(
-                                  category['change'] as String,
+                                  changeLabel,
                                   style: AppConstants.bodySmall.copyWith(
-                                    color: category['isIncrease'] as bool
+                                    color: isIncrease
                                         ? AppConstants.successGreen
                                         : AppConstants.errorRed,
                                     fontWeight: FontWeight.bold,
@@ -1621,23 +1651,22 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                   ),
                   const SizedBox(height: 8),
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(6),
                     child: LinearProgressIndicator(
-                      value: percentage,
-                      minHeight: 8,
+                      value: percentage.clamp(0.0, 1.0),
+                      minHeight: 10,
+                      color: color,
                       backgroundColor: AppConstants.dividerColor,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        category['color'] as Color,
-                      ),
                     ),
                   ),
                 ],
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
+
   }
 
   /// Order Channel Forecast (Delivery vs Dine-In)
@@ -4412,10 +4441,20 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           )
           .toList();
 
+      final forecastRangeStart = resolvedRange.previousStart;
+      final forecastRangeEnd = resolvedRange.end;
+      final transactionsForForecast = transactions.where((record) {
+        final day = _dateOnly(record.timestamp);
+        return !day.isBefore(forecastRangeStart) &&
+            !day.isAfter(forecastRangeEnd);
+      }).toList();
+      final forecastInputTransactions =
+          transactionsForForecast.isNotEmpty ? transactionsForForecast : transactions;
+
       final forecastResult = _forecastService.computeForecast(
         startDate: now,
         rangeDays: rangeDays,
-        transactions: transactions,
+        transactions: forecastInputTransactions,
         eventImpacts: impacts,
         historicalRangeStart: resolvedRange.start,
         historicalRangeEnd: resolvedRange.end,
