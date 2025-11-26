@@ -14,13 +14,15 @@ import 'screens/user_profile_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/auth_service.dart';
+import 'services/expense_service.dart';
+import 'services/transaction_service.dart'; // ADD THIS
 import 'services/transaction_service.dart';
 import 'utils/constants.dart';
 
 /// Main entry point of the SmartServe POS application
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize Firebase (check if already initialized to avoid duplicate app error)
   try {
     await Firebase.initializeApp(
@@ -35,7 +37,7 @@ void main() async {
       rethrow;
     }
   }
-  
+
   runApp(const SmartServePOS());
 }
 
@@ -47,66 +49,66 @@ class SmartServePOS extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider<AuthService>(
-          create: (_) => AuthService(),
-        ),
-        Provider<TransactionService>( // ADD THIS
+        Provider<AuthService>(create: (_) => AuthService()),
+        Provider<TransactionService>(
+          // ADD THIS
           create: (_) => TransactionService(),
         ),
+        Provider<ExpenseService>(create: (_) => ExpenseService()),
       ],
       child: MaterialApp(
         title: AppConstants.appName,
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
-        // Dark theme configuration
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: AppConstants.darkBackground,
-        primaryColor: AppConstants.primaryOrange,
-        colorScheme: ColorScheme.dark(
-          primary: AppConstants.primaryOrange,
-          secondary: AppConstants.accentOrange,
-          surface: AppConstants.cardBackground,
-          error: AppConstants.errorRed,
-        ),
-        appBarTheme: AppBarTheme(
-          backgroundColor: AppConstants.darkSecondary,
-          elevation: 0,
-          iconTheme: const IconThemeData(color: AppConstants.textPrimary),
-          titleTextStyle: AppConstants.headingMedium,
-        ),
-        cardTheme: CardThemeData(
-          color: AppConstants.cardBackground,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+          // Dark theme configuration
+          brightness: Brightness.dark,
+          scaffoldBackgroundColor: AppConstants.darkBackground,
+          primaryColor: AppConstants.primaryOrange,
+          colorScheme: ColorScheme.dark(
+            primary: AppConstants.primaryOrange,
+            secondary: AppConstants.accentOrange,
+            surface: AppConstants.cardBackground,
+            error: AppConstants.errorRed,
           ),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppConstants.primaryOrange,
-            foregroundColor: Colors.white,
+          appBarTheme: AppBarTheme(
+            backgroundColor: AppConstants.darkSecondary,
+            elevation: 0,
+            iconTheme: const IconThemeData(color: AppConstants.textPrimary),
+            titleTextStyle: AppConstants.headingMedium,
+          ),
+          cardTheme: CardThemeData(
+            color: AppConstants.cardBackground,
+            elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
             ),
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppConstants.paddingLarge,
-              vertical: AppConstants.paddingMedium,
+          ),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppConstants.primaryOrange,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppConstants.paddingLarge,
+                vertical: AppConstants.paddingMedium,
+              ),
             ),
           ),
+          floatingActionButtonTheme: FloatingActionButtonThemeData(
+            backgroundColor: AppConstants.primaryOrange,
+            foregroundColor: Colors.white,
+          ),
+          textTheme: const TextTheme(
+            headlineLarge: AppConstants.headingLarge,
+            headlineMedium: AppConstants.headingMedium,
+            headlineSmall: AppConstants.headingSmall,
+            bodyLarge: AppConstants.bodyLarge,
+            bodyMedium: AppConstants.bodyMedium,
+            bodySmall: AppConstants.bodySmall,
+          ),
         ),
-        floatingActionButtonTheme: FloatingActionButtonThemeData(
-          backgroundColor: AppConstants.primaryOrange,
-          foregroundColor: Colors.white,
-        ),
-        textTheme: const TextTheme(
-          headlineLarge: AppConstants.headingLarge,
-          headlineMedium: AppConstants.headingMedium,
-          headlineSmall: AppConstants.headingSmall,
-          bodyLarge: AppConstants.bodyLarge,
-          bodyMedium: AppConstants.bodyMedium,
-          bodySmall: AppConstants.bodySmall,
-        ),
-      ),
         home: const AuthWrapper(),
       ),
     );
@@ -133,9 +135,7 @@ class AuthWrapper extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(
-                    color: AppConstants.primaryOrange,
-                  ),
+                  CircularProgressIndicator(color: AppConstants.primaryOrange),
                   const SizedBox(height: 16),
                   Text(
                     'Loading...',
@@ -188,10 +188,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     return Scaffold(
       key: _scaffoldKey,
       drawer: _buildDrawer(context),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: AppConstants.darkSecondary,
@@ -228,7 +225,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   /// Build navigation item
   Widget _buildNavItem(int index, IconData icon, String label) {
     final isSelected = _currentIndex == index;
-    
+
     return InkWell(
       onTap: () {
         setState(() {
@@ -369,7 +366,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       Navigator.pop(context);
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const TransactionHistoryScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const TransactionHistoryScreen(),
+                        ),
                       );
                     },
                   ),
@@ -381,7 +380,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       Navigator.pop(context);
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const SalesHistoryScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const SalesHistoryScreen(),
+                        ),
                       );
                     },
                   ),
@@ -394,7 +395,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       Navigator.pop(context);
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const SettingsScreen(),
+                        ),
                       );
                     },
                   ),
@@ -409,9 +412,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 final data = snapshot.data ?? <String, dynamic>{};
                 final loadingProfile =
                     snapshot.connectionState == ConnectionState.waiting &&
-                        !snapshot.hasData;
+                    !snapshot.hasData;
 
-                final nameSource = (data['username'] as String?) ??
+                final nameSource =
+                    (data['username'] as String?) ??
                     (data['displayName'] as String?) ??
                     firebaseUser?.displayName ??
                     firebaseUser?.email ??
@@ -419,9 +423,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 final sanitizedName = nameSource.trim().isNotEmpty
                     ? nameSource.trim()
                     : 'SmartServe User';
-                final emailSource = (data['email'] as String?) ??
-                    firebaseUser?.email ??
-                    '';
+                final emailSource =
+                    (data['email'] as String?) ?? firebaseUser?.email ?? '';
                 final sanitizedEmail = emailSource.trim().isNotEmpty
                     ? emailSource.trim()
                     : 'Tap profile to add email';
@@ -504,15 +507,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: Icon(
-        icon,
-        color: AppConstants.textPrimary,
-        size: 24,
-      ),
-      title: Text(
-        title,
-        style: AppConstants.bodyMedium,
-      ),
+      leading: Icon(icon, color: AppConstants.textPrimary, size: 24),
+      title: Text(title, style: AppConstants.bodyMedium),
       onTap: onTap,
       hoverColor: AppConstants.primaryOrange.withOpacity(0.1),
       shape: RoundedRectangleBorder(
@@ -536,15 +532,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         ),
         title: Row(
           children: [
-            Icon(
-              Icons.info_outline,
-              color: AppConstants.primaryOrange,
-            ),
+            Icon(Icons.info_outline, color: AppConstants.primaryOrange),
             const SizedBox(width: AppConstants.paddingSmall),
-            Text(
-              feature,
-              style: AppConstants.headingSmall,
-            ),
+            Text(feature, style: AppConstants.headingSmall),
           ],
         ),
         content: Text(
@@ -577,15 +567,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         ),
         title: Row(
           children: [
-            Icon(
-              Icons.logout,
-              color: AppConstants.errorRed,
-            ),
+            Icon(Icons.logout, color: AppConstants.errorRed),
             const SizedBox(width: AppConstants.paddingSmall),
-            const Text(
-              'Logout',
-              style: AppConstants.headingSmall,
-            ),
+            const Text('Logout', style: AppConstants.headingSmall),
           ],
         ),
         content: Text(
@@ -603,7 +587,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              final authService = Provider.of<AuthService>(context, listen: false);
+              final authService = Provider.of<AuthService>(
+                context,
+                listen: false,
+              );
               final result = await authService.signOut();
               if (result['success'] && context.mounted) {
                 // Navigate to login screen
