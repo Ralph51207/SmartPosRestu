@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-
+import '../services/expense_service.dart';
 import '../services/transaction_service.dart';
 import '../utils/constants.dart';
 import '../utils/formatters.dart';
@@ -22,31 +22,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
 
   SalesGrouping _grouping = SalesGrouping.daily;
 
-  // Expenses data
-  final List<Map<String, dynamic>> _allExpenses = [
-    {
-      'id': 'EXP-001',
-      'category': 'Utilities',
-      'description': 'Electricity Bill',
-      'amount': 2500.0,
-      'date': DateTime.now(),
-    },
-    {
-      'id': 'EXP-002',
-      'category': 'Supplies',
-      'description': 'Food Ingredients',
-      'amount': 5800.0,
-      'date': DateTime.now().subtract(const Duration(days: 1)),
-    },
-    {
-      'id': 'EXP-003',
-      'category': 'Salaries',
-      'description': 'Staff Wages',
-      'amount': 8000.0,
-      'date': DateTime.now().subtract(const Duration(days: 2)),
-    },
-  ];
-
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
@@ -59,18 +34,12 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     return !date.isBefore(_startDate!) && !date.isAfter(_endDate!);
   }
 
-  List<Map<String, dynamic>> get _filteredExpenses {
-    return _allExpenses.where((e) {
-      final date = e['date'] as DateTime;
-      return _isDateInRange(date);
-    }).toList();
+  List<ExpenseRecord> _filterExpenses(List<ExpenseRecord> expenses) {
+    return expenses.where((expense) => _isDateInRange(expense.date)).toList();
   }
 
-  double _asDouble(dynamic value) {
-    if (value is num) {
-      return value.toDouble();
-    }
-    return double.tryParse(value?.toString() ?? '0') ?? 0;
+  double _calculateTotalExpenses(List<ExpenseRecord> expenses) {
+    return expenses.fold(0.0, (sum, expense) => sum + expense.amount);
   }
 
   Future<void> _pickDateRange() async {
@@ -137,8 +106,12 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   }
 
   String get _dateRangeText {
-    if (_startDate == null) return 'All dates';
-    if (_endDate == null) return Formatters.formatDate(_startDate!);
+    if (_startDate == null) {
+      return 'All dates';
+    }
+    if (_endDate == null) {
+      return Formatters.formatDate(_startDate!);
+    }
     return '${Formatters.formatDate(_startDate!)} - ${Formatters.formatDate(_endDate!)}';
   }
 
@@ -160,13 +133,15 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     );
   }
 
-  void _showAddExpenseDialog() {
+  Future<void> _showAddExpenseDialog() async {
     final descriptionController = TextEditingController();
     final amountController = TextEditingController();
     DateTime selectedDate = DateTime.now();
     String selectedCategory = 'Utilities';
+    final expenseService = Provider.of<ExpenseService>(context, listen: false);
+    final messenger = ScaffoldMessenger.of(context);
 
-    final categories = [
+    const categories = [
       'Utilities',
       'Supplies',
       'Salaries',
@@ -177,9 +152,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       'Other',
     ];
 
-    showDialog(
+    await showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
+      builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           backgroundColor: AppConstants.darkSecondary,
           title: const Text('Add Expense', style: AppConstants.headingSmall),
@@ -188,7 +163,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Category Dropdown
                 const Text('Category', style: AppConstants.bodyMedium),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
@@ -221,14 +195,15 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     );
                   }).toList(),
                   onChanged: (value) {
+                    if (value == null) {
+                      return;
+                    }
                     setDialogState(() {
-                      selectedCategory = value!;
+                      selectedCategory = value;
                     });
                   },
                 ),
                 const SizedBox(height: AppConstants.paddingMedium),
-
-                // Description
                 const Text('Description', style: AppConstants.bodyMedium),
                 const SizedBox(height: 8),
                 TextField(
@@ -260,13 +235,13 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   ),
                 ),
                 const SizedBox(height: AppConstants.paddingMedium),
-
-                // Amount
                 const Text('Amount', style: AppConstants.bodyMedium),
                 const SizedBox(height: 8),
                 TextField(
                   controller: amountController,
-                  keyboardType: TextInputType.number,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   style: AppConstants.bodyMedium,
                   decoration: InputDecoration(
                     hintText: '0.00',
@@ -295,8 +270,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   ),
                 ),
                 const SizedBox(height: AppConstants.paddingMedium),
-
-                // Date Picker
                 const Text('Date', style: AppConstants.bodyMedium),
                 const SizedBox(height: 8),
                 InkWell(
@@ -306,7 +279,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                       initialDate: selectedDate,
                       firstDate: DateTime(2020),
                       lastDate: DateTime.now(),
-                      builder: (context, child) => Theme(
+                      builder: (pickerContext, child) => Theme(
                         data: Theme.of(context).copyWith(
                           colorScheme: ColorScheme.dark(
                             primary: AppConstants.primaryOrange,
@@ -354,7 +327,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.of(dialogContext).pop(),
               child: Text(
                 'Cancel',
                 style: AppConstants.bodyMedium.copyWith(
@@ -363,10 +336,15 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               ),
             ),
             ElevatedButton(
-              onPressed: () {
-                if (descriptionController.text.isEmpty ||
-                    amountController.text.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+              onPressed: () async {
+                final description = descriptionController.text.trim();
+                final rawAmount = amountController.text.trim().replaceAll(
+                  ',',
+                  '',
+                );
+
+                if (description.isEmpty || rawAmount.isEmpty) {
+                  messenger.showSnackBar(
                     const SnackBar(
                       content: Text('Please fill in all fields'),
                       backgroundColor: AppConstants.errorRed,
@@ -375,9 +353,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   return;
                 }
 
-                final amount = double.tryParse(amountController.text);
+                final amount = double.tryParse(rawAmount);
                 if (amount == null || amount <= 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     const SnackBar(
                       content: Text('Please enter a valid amount'),
                       backgroundColor: AppConstants.errorRed,
@@ -386,23 +364,34 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   return;
                 }
 
-                setState(() {
-                  _allExpenses.add({
-                    'id': 'EXP-${_allExpenses.length + 1}',
-                    'category': selectedCategory,
-                    'description': descriptionController.text,
-                    'amount': amount,
-                    'date': selectedDate,
-                  });
-                });
-
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Expense added successfully'),
-                    backgroundColor: AppConstants.successGreen,
-                  ),
-                );
+                try {
+                  await expenseService.addExpense(
+                    category: selectedCategory,
+                    description: description,
+                    amount: amount,
+                    date: selectedDate,
+                  );
+                  if (!mounted) {
+                    return;
+                  }
+                  Navigator.of(dialogContext).pop();
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('Expense added successfully'),
+                      backgroundColor: AppConstants.successGreen,
+                    ),
+                  );
+                } catch (e) {
+                  if (!mounted) {
+                    return;
+                  }
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to add expense. Please try again.'),
+                      backgroundColor: AppConstants.errorRed,
+                    ),
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppConstants.primaryOrange,
@@ -417,207 +406,428 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   }
 
   void _showExpensesDialog() {
-    final expenses = _filteredExpenses;
-    final totalExpenses = expenses.fold(
-      0.0,
-      (sum, expense) => sum + _asDouble(expense['amount']),
-    );
+    final expenseService = Provider.of<ExpenseService>(context, listen: false);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    String? selectedExpenseId;
+    bool isDeleteMode = false;
+
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: AppConstants.darkSecondary,
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.8,
-          height: MediaQuery.of(context).size.height * 0.7,
-          padding: const EdgeInsets.all(AppConstants.paddingMedium),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Expenses', style: AppConstants.headingMedium),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const Divider(color: AppConstants.dividerColor),
-              const SizedBox(height: AppConstants.paddingSmall),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => Dialog(
+          backgroundColor: AppConstants.darkSecondary,
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.8,
+            height: MediaQuery.of(context).size.height * 0.7,
+            padding: const EdgeInsets.all(AppConstants.paddingMedium),
+            child: StreamBuilder<List<ExpenseRecord>>(
+              stream: expenseService.watchExpenses(),
+              builder: (streamContext, snapshot) {
+                final expenses = _filterExpenses(
+                  snapshot.data ?? const <ExpenseRecord>[],
+                );
+                final totalExpenses = _calculateTotalExpenses(expenses);
+                final isLoading =
+                    snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData;
 
-              // Total Expenses Summary
-              Container(
-                padding: const EdgeInsets.all(AppConstants.paddingMedium),
-                decoration: BoxDecoration(
-                  color: AppConstants.errorRed.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(
-                    AppConstants.radiusMedium,
-                  ),
-                  border: Border.all(color: AppConstants.errorRed),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                ExpenseRecord? selectedExpense;
+                if (selectedExpenseId != null) {
+                  for (final expense in expenses) {
+                    if (expense.id == selectedExpenseId) {
+                      selectedExpense = expense;
+                      break;
+                    }
+                  }
+                }
+
+                Future<void> confirmDeletion() async {
+                  if (selectedExpense == null) {
+                    return;
+                  }
+
+                  final shouldDelete = await showDialog<bool>(
+                    context: dialogContext,
+                    builder: (confirmContext) => AlertDialog(
+                      backgroundColor: AppConstants.darkSecondary,
+                      title: const Text(
+                        'Delete Expense',
+                        style: AppConstants.headingSmall,
+                      ),
+                      content: Text(
+                        'Are you sure you want to delete "${selectedExpense!.description}"?',
+                        style: AppConstants.bodyMedium,
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () =>
+                              Navigator.of(confirmContext).pop(false),
+                          child: Text(
+                            'Cancel',
+                            style: AppConstants.bodyMedium.copyWith(
+                              color: AppConstants.textSecondary,
+                            ),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed: () =>
+                              Navigator.of(confirmContext).pop(true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppConstants.errorRed,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (shouldDelete != true) {
+                    return;
+                  }
+
+                  try {
+                    await expenseService.deleteExpense(selectedExpense!.id);
+                    if (!mounted) return;
+                    scaffoldMessenger.showSnackBar(
+                      const SnackBar(
+                        content: Text('Expense deleted'),
+                        backgroundColor: AppConstants.successGreen,
+                      ),
+                    );
+                  } catch (e) {
+                    if (!mounted) return;
+                    scaffoldMessenger.showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Failed to delete expense. Please try again.',
+                        ),
+                        backgroundColor: AppConstants.errorRed,
+                      ),
+                    );
+                  } finally {
+                    setDialogState(() {
+                      selectedExpenseId = null;
+                      isDeleteMode = false;
+                    });
+                  }
+                }
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Total Expenses', style: AppConstants.bodyLarge),
-                    Text(
-                      Formatters.formatCurrency(totalExpenses),
-                      style: AppConstants.headingSmall.copyWith(
-                        color: AppConstants.errorRed,
-                        fontWeight: FontWeight.bold,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Expenses',
+                          style: AppConstants.headingMedium,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                        ),
+                      ],
+                    ),
+                    const Divider(color: AppConstants.dividerColor),
+                    const SizedBox(height: AppConstants.paddingSmall),
+                    Container(
+                      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                      decoration: BoxDecoration(
+                        color: AppConstants.errorRed.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(
+                          AppConstants.radiusMedium,
+                        ),
+                        border: Border.all(color: AppConstants.errorRed),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Total Expenses',
+                            style: AppConstants.bodyLarge,
+                          ),
+                          Text(
+                            Formatters.formatCurrency(totalExpenses),
+                            style: AppConstants.headingSmall.copyWith(
+                              color: AppConstants.errorRed,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppConstants.paddingMedium),
-
-              // Expenses List
-              Expanded(
-                child: expenses.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                    const SizedBox(height: AppConstants.paddingMedium),
+                    if (isDeleteMode)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          bottom: AppConstants.paddingSmall,
+                        ),
+                        child: Row(
                           children: [
                             Icon(
-                              Icons.receipt_outlined,
-                              size: 64,
-                              color: AppConstants.textSecondary.withOpacity(
-                                0.5,
-                              ),
+                              Icons.touch_app,
+                              size: 18,
+                              color: AppConstants.textSecondary,
                             ),
-                            const SizedBox(height: AppConstants.paddingMedium),
-                            Text(
-                              'No expenses recorded',
-                              style: AppConstants.bodyMedium.copyWith(
-                                color: AppConstants.textSecondary,
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                selectedExpense == null
+                                    ? 'Select an expense to delete, then confirm.'
+                                    : 'Selected "${selectedExpense.description}".',
+                                style: AppConstants.bodySmall.copyWith(
+                                  color: AppConstants.textSecondary,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      )
-                    : ListView.separated(
-                        itemCount: expenses.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: AppConstants.paddingSmall),
-                        itemBuilder: (context, index) {
-                          final expense = expenses[index];
-                          return Container(
-                            padding: const EdgeInsets.all(
-                              AppConstants.paddingMedium,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppConstants.cardBackground,
-                              borderRadius: BorderRadius.circular(
-                                AppConstants.radiusMedium,
+                      ),
+                    Expanded(
+                      child: isLoading
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                color: AppConstants.primaryOrange,
                               ),
-                              border: Border.all(
-                                color: AppConstants.dividerColor,
-                              ),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: AppConstants.errorRed.withOpacity(
-                                      0.1,
+                            )
+                          : expenses.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.receipt_outlined,
+                                    size: 64,
+                                    color: AppConstants.textSecondary
+                                        .withOpacity(0.5),
+                                  ),
+                                  const SizedBox(
+                                    height: AppConstants.paddingMedium,
+                                  ),
+                                  Text(
+                                    'No expenses recorded',
+                                    style: AppConstants.bodyMedium.copyWith(
+                                      color: AppConstants.textSecondary,
                                     ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.separated(
+                              itemCount: expenses.length,
+                              separatorBuilder: (_, __) => const SizedBox(
+                                height: AppConstants.paddingSmall,
+                              ),
+                              itemBuilder: (itemContext, index) {
+                                final expense = expenses[index];
+                                final isSelected =
+                                    isDeleteMode &&
+                                    expense.id == selectedExpenseId;
+
+                                return Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: isDeleteMode
+                                        ? () {
+                                            setDialogState(() {
+                                              selectedExpenseId =
+                                                  selectedExpenseId ==
+                                                      expense.id
+                                                  ? null
+                                                  : expense.id;
+                                            });
+                                          }
+                                        : null,
                                     borderRadius: BorderRadius.circular(
-                                      AppConstants.radiusSmall,
+                                      AppConstants.radiusMedium,
                                     ),
-                                  ),
-                                  child: const Icon(
-                                    Icons.money_off,
-                                    color: AppConstants.errorRed,
-                                  ),
-                                ),
-                                const SizedBox(
-                                  width: AppConstants.paddingMedium,
-                                ),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Wrap(
-                                        spacing: 8,
-                                        runSpacing: 4,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(
+                                        AppConstants.paddingMedium,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppConstants.cardBackground,
+                                        borderRadius: BorderRadius.circular(
+                                          AppConstants.radiusMedium,
+                                        ),
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? AppConstants.errorRed
+                                              : AppConstants.dividerColor,
+                                          width: isSelected ? 2 : 1,
+                                        ),
+                                      ),
+                                      child: Row(
                                         crossAxisAlignment:
-                                            WrapCrossAlignment.center,
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            expense['category'],
-                                            style: AppConstants.bodySmall
-                                                .copyWith(
-                                                  color: AppConstants
-                                                      .primaryOrange,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
+                                          Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: AppConstants.errorRed
+                                                  .withOpacity(0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                    AppConstants.radiusSmall,
+                                                  ),
+                                            ),
+                                            child: const Icon(
+                                              Icons.money_off,
+                                              color: AppConstants.errorRed,
+                                            ),
                                           ),
-                                          Text(
-                                            '• ${Formatters.formatDate(expense['date'])}',
-                                            style: AppConstants.bodySmall
-                                                .copyWith(
-                                                  color: AppConstants
-                                                      .textSecondary,
+                                          const SizedBox(
+                                            width: AppConstants.paddingMedium,
+                                          ),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Flexible(
+                                                      child: Text(
+                                                        expense.category,
+                                                        style: AppConstants
+                                                            .bodySmall
+                                                            .copyWith(
+                                                              color: AppConstants
+                                                                  .primaryOrange,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      '• ${Formatters.formatDate(expense.date)}',
+                                                      style: AppConstants
+                                                          .bodySmall
+                                                          .copyWith(
+                                                            color: AppConstants
+                                                                .textSecondary,
+                                                          ),
+                                                    ),
+                                                  ],
                                                 ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  expense.description,
+                                                  style:
+                                                      AppConstants.bodyMedium,
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(
+                                            width: AppConstants.paddingSmall,
+                                          ),
+                                          SizedBox(
+                                            width: 96,
+                                            child: FittedBox(
+                                              fit: BoxFit.scaleDown,
+                                              alignment: Alignment.centerRight,
+                                              child: Text(
+                                                Formatters.formatCurrency(
+                                                  expense.amount,
+                                                ),
+                                                style: AppConstants.bodyLarge
+                                                    .copyWith(
+                                                      color:
+                                                          AppConstants.errorRed,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                textAlign: TextAlign.right,
+                                              ),
+                                            ),
                                           ),
                                         ],
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        expense['description'],
-                                        style: AppConstants.bodyMedium,
-                                      ),
-                                    ],
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: AppConstants.paddingSmall),
-                                Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      Formatters.formatCurrency(
-                                        _asDouble(expense['amount']),
-                                      ),
-                                      style: AppConstants.bodyLarge.copyWith(
-                                        color: AppConstants.errorRed,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      textAlign: TextAlign.right,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    IconButton(
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(
-                                        minWidth: 36,
-                                        minHeight: 36,
-                                      ),
-                                      icon: const Icon(
-                                        Icons.delete_outline,
-                                        size: 20,
-                                      ),
-                                      color: AppConstants.errorRed,
-                                      onPressed: () {
-                                        setState(() {
-                                          _allExpenses.remove(expense);
-                                        });
-                                        Navigator.pop(context);
-                                        _showExpensesDialog();
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ],
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
-              ),
-            ],
+                    ),
+                    const SizedBox(height: AppConstants.paddingMedium),
+                    Row(
+                      children: [
+                        if (!isDeleteMode)
+                          ElevatedButton.icon(
+                            onPressed: expenses.isEmpty
+                                ? null
+                                : () {
+                                    setDialogState(() {
+                                      isDeleteMode = true;
+                                      selectedExpenseId = null;
+                                    });
+                                  },
+                            icon: const Icon(Icons.delete_outline),
+                            label: const Text('Delete Expense'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppConstants.errorRed,
+                              foregroundColor: Colors.white,
+                            ),
+                          )
+                        else ...[
+                          ElevatedButton.icon(
+                            onPressed: selectedExpense == null
+                                ? null
+                                : () => confirmDeletion(),
+                            icon: const Icon(Icons.check_circle_outline),
+                            label: const Text('Confirm Delete'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppConstants.errorRed,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: AppConstants.paddingSmall),
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              setDialogState(() {
+                                isDeleteMode = false;
+                                selectedExpenseId = null;
+                              });
+                            },
+                            icon: const Icon(Icons.close),
+                            label: const Text('Cancel'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppConstants.textSecondary,
+                              side: const BorderSide(
+                                color: AppConstants.dividerColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        TextButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          child: Text(
+                            'Close',
+                            style: AppConstants.bodyMedium.copyWith(
+                              color: AppConstants.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -630,6 +840,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       context,
       listen: false,
     );
+    final expenseService = Provider.of<ExpenseService>(context, listen: false);
 
     return Scaffold(
       backgroundColor: AppConstants.darkBackground,
@@ -662,13 +873,14 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       ),
       body: StreamBuilder<List<TransactionRecord>>(
         stream: transactionService.watchTransactions(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
+        builder: (context, transactionSnapshot) {
+          if (transactionSnapshot.hasError) {
             return _buildErrorState(
-              snapshot.error?.toString() ?? 'Failed to load sales data',
+              transactionSnapshot.error?.toString() ??
+                  'Failed to load sales data',
             );
           }
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (transactionSnapshot.connectionState == ConnectionState.waiting) {
             return const Center(
               child: CircularProgressIndicator(
                 color: AppConstants.primaryOrange,
@@ -677,40 +889,53 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           }
 
           final transactions = _filterTransactions(
-            snapshot.data ?? const <TransactionRecord>[],
+            transactionSnapshot.data ?? const <TransactionRecord>[],
           );
           final summaries = _buildSummaries(transactions);
           final totalSales = _calculateSalesTotal(transactions);
           final totalOrders = transactions.length;
-          final avgOrderValue = totalOrders == 0 ? 0.0 : totalSales / totalOrders;
-          final expenses = _filteredExpenses;
-          final totalExpenses = expenses.fold(
-            0.0,
-            (sum, expense) => sum + _asDouble(expense['amount']),
-          );
-          final netProfit = totalSales - totalExpenses;
+          final avgOrderValue = totalOrders == 0
+              ? 0.0
+              : totalSales / totalOrders;
 
-          return Column(
-            children: [
-              _buildDateSelectorSection(),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      _buildProfitCards(
-                        totalSales,
-                        totalExpenses,
-                        netProfit,
-                        expenses.length,
+          return StreamBuilder<List<ExpenseRecord>>(
+            stream: expenseService.watchExpenses(),
+            builder: (context, expenseSnapshot) {
+              if (expenseSnapshot.hasError) {
+                return _buildErrorState(
+                  'Failed to load expenses. Please try again later.',
+                );
+              }
+
+              final filteredExpenses = _filterExpenses(
+                expenseSnapshot.data ?? const <ExpenseRecord>[],
+              );
+              final totalExpenses = _calculateTotalExpenses(filteredExpenses);
+              final netProfit = totalSales - totalExpenses;
+
+              return Column(
+                children: [
+                  _buildDateSelectorSection(),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          _buildProfitCards(
+                            totalSales,
+                            totalExpenses,
+                            netProfit,
+                            filteredExpenses,
+                          ),
+                          _buildSalesTable(summaries),
+                          const SizedBox(height: AppConstants.paddingMedium),
+                        ],
                       ),
-                      _buildSalesTable(summaries),
-                      const SizedBox(height: AppConstants.paddingMedium),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-              _buildFooter(totalSales, totalOrders, avgOrderValue),
-            ],
+                  _buildFooter(totalSales, totalOrders, avgOrderValue),
+                ],
+              );
+            },
           );
         },
       ),
@@ -825,21 +1050,23 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   }
 
   Widget _buildProfitCards(
-    double totalSales,
+    double grossProfit,
     double totalExpenses,
     double netProfit,
-    int expenseCount,
+    List<ExpenseRecord> expenses,
   ) {
+    const cardHeight = 160.0;
     return Container(
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       child: Row(
         children: [
           Expanded(
             child: _buildProfitCard(
-              'Sales',
-              totalSales,
+              'Gross Profit',
+              grossProfit,
               AppConstants.successGreen,
               Icons.trending_up,
+              height: cardHeight,
             ),
           ),
           const SizedBox(width: AppConstants.paddingMedium),
@@ -851,8 +1078,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 totalExpenses,
                 AppConstants.errorRed,
                 Icons.money_off,
-                showBadge: true,
-                badgeValue: expenseCount,
+                showBadge: expenses.isNotEmpty,
+                badgeValue: expenses.length,
+                height: cardHeight,
               ),
             ),
           ),
@@ -865,6 +1093,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   ? AppConstants.primaryOrange
                   : AppConstants.errorRed,
               Icons.account_balance_wallet,
+              height: cardHeight,
             ),
           ),
         ],
@@ -1058,7 +1287,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: _showAddExpenseDialog,
+                  onPressed: () => _showAddExpenseDialog(),
                   icon: const Icon(Icons.add),
                   label: const Text('Add Expense'),
                   style: ElevatedButton.styleFrom(
@@ -1173,63 +1402,79 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     IconData icon, {
     bool showBadge = false,
     int badgeValue = 0,
+    double height = 160,
   }) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 140),
-      padding: const EdgeInsets.all(AppConstants.paddingMedium),
-      decoration: BoxDecoration(
-        color: AppConstants.cardBackground,
-        borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Icon(icon, color: color, size: 24),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                style: AppConstants.bodySmall.copyWith(
-                  color: AppConstants.textSecondary,
+    final valueText = Formatters.formatCurrency(value);
+
+    return SizedBox(
+      height: height,
+      child: Container(
+        padding: const EdgeInsets.all(AppConstants.paddingMedium),
+        decoration: BoxDecoration(
+          color: AppConstants.cardBackground,
+          borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: color, size: 24),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      style: AppConstants.bodySmall.copyWith(
+                        color: AppConstants.textSecondary,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                Formatters.formatCurrency(value),
-                style: AppConstants.bodyLarge.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.bold,
+                const SizedBox(height: 6),
+                SizedBox(
+                  width: double.infinity,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      valueText,
+                      style: AppConstants.bodyLarge.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                 ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-          if (showBadge)
-            Positioned(
-              top: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(
-                  color: AppConstants.primaryOrange,
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  '$badgeValue',
-                  style: AppConstants.bodySmall.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 10,
+              ],
+            ),
+            if (showBadge)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: AppConstants.primaryOrange,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    '$badgeValue',
+                    style: AppConstants.bodySmall.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 10,
+                    ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
