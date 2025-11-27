@@ -488,7 +488,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   }
 
                   try {
-                    await expenseService.deleteExpense(selectedExpense!.id);
+                    await expenseService.deleteExpense(selectedExpense.id);
                     if (!mounted) return;
                     scaffoldMessenger.showSnackBar(
                       const SnackBar(

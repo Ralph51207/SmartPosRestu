@@ -15,7 +15,7 @@ import 'screens/settings_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/auth_service.dart';
 import 'services/expense_service.dart';
-import 'services/transaction_service.dart'; // ADD THIS
+import 'services/staff_service.dart';
 import 'services/transaction_service.dart';
 import 'utils/constants.dart';
 
@@ -50,11 +50,9 @@ class SmartServePOS extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<AuthService>(create: (_) => AuthService()),
-        Provider<TransactionService>(
-          // ADD THIS
-          create: (_) => TransactionService(),
-        ),
+        Provider<TransactionService>(create: (_) => TransactionService()),
         Provider<ExpenseService>(create: (_) => ExpenseService()),
+        Provider<StaffService>(create: (_) => StaffService()),
       ],
       child: MaterialApp(
         title: AppConstants.appName,

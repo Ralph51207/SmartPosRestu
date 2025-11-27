@@ -55,25 +55,32 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
       _ordersError = null;
     });
 
-    final todayStart = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final todayStart = DateTime(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
 
     _ordersSubscription = _orderService
         .getOrdersStream(start: todayStart)
-        .listen((orders) {
-      if (!mounted) return;
-      setState(() {
-        _orders
-          ..clear()
-          ..addAll(orders);
-        _isLoadingOrders = false;
-      });
-    }, onError: (error) {
-      if (!mounted) return;
-      setState(() {
-        _isLoadingOrders = false;
-        _ordersError = error.toString();
-      });
-    });
+        .listen(
+          (orders) {
+            if (!mounted) return;
+            setState(() {
+              _orders
+                ..clear()
+                ..addAll(orders);
+              _isLoadingOrders = false;
+            });
+          },
+          onError: (error) {
+            if (!mounted) return;
+            setState(() {
+              _isLoadingOrders = false;
+              _ordersError = error.toString();
+            });
+          },
+        );
   }
 
   void _scheduleMidnightTimer() {
@@ -259,7 +266,9 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
             ),
           ),
           // Status filters
-            ...OrderStatus.values.where((s) => s != OrderStatus.preparing).map((status) {
+          ...OrderStatus.values.where((s) => s != OrderStatus.preparing).map((
+            status,
+          ) {
             final isSelected = _selectedFilter == status;
             return Padding(
               padding: const EdgeInsets.only(right: AppConstants.paddingSmall),
@@ -392,7 +401,11 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
   Future<void> _handleOrderQuickAction(Order order, String action) async {
     switch (action) {
       case 'assign':
-        await _showCompactTablePicker(order, allowOccupied: false, mode: 'assign');
+        await _showCompactTablePicker(
+          order,
+          allowOccupied: false,
+          mode: 'assign',
+        );
         break;
       case 'move':
         await _showCompactTablePicker(order, allowOccupied: true, mode: 'move');
@@ -411,7 +424,11 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
     }
   }
 
-  Future<void> _showCompactTablePicker(Order order, {bool allowOccupied = false, required String mode}) async {
+  Future<void> _showCompactTablePicker(
+    Order order, {
+    bool allowOccupied = false,
+    required String mode,
+  }) async {
     // fetch current tables snapshot
     final tables = await _tableService.getTablesStream().first;
     // Sort tables by numeric tableNumber when possible so picker shows same sequence as main grid
@@ -424,17 +441,28 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
       }
       return a.tableNumber.compareTo(b.tableNumber);
     });
-    final candidates = allowOccupied ? sortedTables : sortedTables.where((t) => t.status == TableStatus.free).toList();
+    final candidates = allowOccupied
+        ? sortedTables
+        : sortedTables.where((t) => t.status == TableStatus.free).toList();
 
     final picked = await showModalBottomSheet<RestaurantTable>(
       context: context,
       backgroundColor: AppConstants.cardBackground,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppConstants.radiusLarge))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppConstants.radiusLarge),
+        ),
+      ),
       builder: (context) => Container(
         padding: const EdgeInsets.all(AppConstants.paddingLarge),
         child: GridView.builder(
           shrinkWrap: true,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.68),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 0.68,
+          ),
           itemCount: candidates.length,
           itemBuilder: (context, i) {
             final t = candidates[i];
@@ -454,12 +482,22 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
 
     try {
       await _orderService.assignOrderToTableAtomic(order.id, picked.id);
-      await _orderService.updateOrder(order.copyWith(tableNumber: picked.tableNumber));
+      await _orderService.updateOrder(
+        order.copyWith(tableNumber: picked.tableNumber),
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Order ${order.id} ${mode == 'move' ? 'moved' : 'assigned'} to Table ${picked.tableNumber}')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Order ${order.id} ${mode == 'move' ? 'moved' : 'assigned'} to Table ${picked.tableNumber}',
+          ),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to assign table: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to assign table: $e')));
     }
   }
 
@@ -475,7 +513,9 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
       }
       return a.tableNumber.compareTo(b.tableNumber);
     });
-    final occupiedTables = sorted.where((t) => t.currentOrderId != null && t.currentOrderId!.isNotEmpty).toList();
+    final occupiedTables = sorted
+        .where((t) => t.currentOrderId != null && t.currentOrderId!.isNotEmpty)
+        .toList();
     final picked = await showModalBottomSheet<RestaurantTable>(
       context: context,
       backgroundColor: AppConstants.cardBackground,
@@ -508,9 +548,19 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
       final mergedItems = <dynamic>[];
       mergedItems.addAll(targetOrder.items);
       mergedItems.addAll(order.items);
-      final mergedTotal = mergedItems.fold<double>(0, (s, it) => s + ((it.totalPrice is num) ? (it.totalPrice as num).toDouble() : double.tryParse(it.totalPrice?.toString() ?? '0') ?? 0));
+      final mergedTotal = mergedItems.fold<double>(
+        0,
+        (s, it) =>
+            s +
+            ((it.totalPrice is num)
+                ? (it.totalPrice as num).toDouble()
+                : double.tryParse(it.totalPrice?.toString() ?? '0') ?? 0),
+      );
 
-      final updatedTarget = targetOrder.copyWith(items: mergedItems.cast(), totalAmount: mergedTotal);
+      final updatedTarget = targetOrder.copyWith(
+        items: mergedItems.cast(),
+        totalAmount: mergedTotal,
+      );
 
       await _orderService.updateOrder(updatedTarget);
       // remove source order and clear its table references
@@ -518,24 +568,38 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
       await _orderService.detachOrderFromTableAtomic(order.id);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Merged Order ${order.id} into ${targetOrder.id}')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Merged Order ${order.id} into ${targetOrder.id}'),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Merge failed: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Merge failed: $e')));
     }
   }
 
   Future<void> _seatStartOrder(Order order) async {
     try {
       if (order.tableNumber.trim().isEmpty || order.tableNumber == 'NO_TABLE') {
-        await _showCompactTablePicker(order, allowOccupied: false, mode: 'seat');
+        await _showCompactTablePicker(
+          order,
+          allowOccupied: false,
+          mode: 'seat',
+        );
       }
       await _orderService.updateOrderStatus(order.id, OrderStatus.preparing);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Order ${order.id} started')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Order ${order.id} started')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to start order: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to start order: $e')));
     }
   }
 
@@ -579,7 +643,9 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
               },
             ),
             // Status options (exclude preparing state from this UI)
-            ...OrderStatus.values.where((s) => s != OrderStatus.preparing).map((status) {
+            ...OrderStatus.values.where((s) => s != OrderStatus.preparing).map((
+              status,
+            ) {
               return RadioListTile<OrderStatus?>(
                 title: Text(
                   status.toString().split('.').last.toUpperCase(),
@@ -640,23 +706,40 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   ListTile(
-                    leading: const Icon(Icons.assignment, color: AppConstants.textPrimary),
+                    leading: const Icon(
+                      Icons.assignment,
+                      color: AppConstants.textPrimary,
+                    ),
                     title: const Text('Assign to table'),
                     onTap: () {
                       Navigator.pop(context);
-                      _showCompactTablePicker(order, allowOccupied: false, mode: 'assign');
+                      _showCompactTablePicker(
+                        order,
+                        allowOccupied: false,
+                        mode: 'assign',
+                      );
                     },
                   ),
                   ListTile(
-                    leading: const Icon(Icons.open_with, color: AppConstants.textPrimary),
+                    leading: const Icon(
+                      Icons.open_with,
+                      color: AppConstants.textPrimary,
+                    ),
                     title: const Text('Move to table'),
                     onTap: () {
                       Navigator.pop(context);
-                      _showCompactTablePicker(order, allowOccupied: true, mode: 'move');
+                      _showCompactTablePicker(
+                        order,
+                        allowOccupied: true,
+                        mode: 'move',
+                      );
                     },
                   ),
                   ListTile(
-                    leading: const Icon(Icons.merge_type, color: AppConstants.textPrimary),
+                    leading: const Icon(
+                      Icons.merge_type,
+                      color: AppConstants.textPrimary,
+                    ),
                     title: const Text('Merge with table'),
                     onTap: () {
                       Navigator.pop(context);
@@ -664,7 +747,10 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                     },
                   ),
                   ListTile(
-                    leading: const Icon(Icons.event_seat, color: AppConstants.textPrimary),
+                    leading: const Icon(
+                      Icons.event_seat,
+                      color: AppConstants.textPrimary,
+                    ),
                     title: const Text('Seat / Start order'),
                     onTap: () {
                       Navigator.pop(context);
@@ -690,15 +776,19 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Table:', style: AppConstants.bodyMedium),
-                        Text(
-                          // If orderType indicates takeout/delivery, show that instead of a table label
-                          (order is dynamic && (order.orderType == 'takeout' || order.orderType == 'delivery'))
-                              ? (order.orderType == 'takeout' ? 'Takeout' : 'Delivery')
-                              : _formatTableLabel(order.tableNumber),
-                          style: AppConstants.bodyLarge.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                      Text(
+                        // If orderType indicates takeout/delivery, show that instead of a table label
+                        (order is dynamic &&
+                                (order.orderType == 'takeout' ||
+                                    order.orderType == 'delivery'))
+                            ? (order.orderType == 'takeout'
+                                  ? 'Takeout'
+                                  : 'Delivery')
+                            : _formatTableLabel(order.tableNumber),
+                        style: AppConstants.bodyLarge.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -748,7 +838,11 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.note, size: 16, color: AppConstants.textSecondary),
+                        const Icon(
+                          Icons.note,
+                          size: 16,
+                          color: AppConstants.textSecondary,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -797,7 +891,9 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                     padding: const EdgeInsets.all(AppConstants.paddingSmall),
                     decoration: BoxDecoration(
                       color: AppConstants.darkSecondary,
-                      borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+                      borderRadius: BorderRadius.circular(
+                        AppConstants.radiusSmall,
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -900,7 +996,12 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                         ? null
                         : () {
                             Navigator.pop(context);
-                            _showCheckoutDialog(order);
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (!mounted) {
+                                return;
+                              }
+                              _showCheckoutDialog(order);
+                            });
                           },
                     icon: const Icon(Icons.payment),
                     label: const Text('Checkout'),
@@ -986,289 +1087,20 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
 
   /// Show checkout dialog with amount paid and change calculation
   void _showCheckoutDialog(Order order) {
-    String selectedPaymentMethod = 'Cash';
-    double amountPaid = 0;
-    double change = 0;
-
-    final List<String> paymentMethods = [
-      'Cash',
-      'Credit Card',
-      'Debit Card',
-      'GCash',
-      'PayMaya',
-    ];
-
-    showDialog(
+    showDialog<_CheckoutResult>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: AppConstants.cardBackground,
-          title: Row(
-            children: [
-              const Icon(Icons.payment, color: AppConstants.primaryOrange),
-              const SizedBox(width: 8),
-              const Text('Checkout', style: AppConstants.headingMedium),
-            ],
-          ),
-          content: SizedBox(
-            width: 500, // ADD THIS - Fixed width
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Order Summary
-                  Container(
-                    padding: const EdgeInsets.all(AppConstants.paddingMedium),
-                    decoration: BoxDecoration(
-                      color: AppConstants.darkSecondary,
-                      borderRadius: BorderRadius.circular(
-                        AppConstants.radiusSmall,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Order #${order.id}',
-                          style: AppConstants.bodyLarge.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Table ${order.tableNumber}',
-                          style: AppConstants.bodyMedium.copyWith(
-                            color: AppConstants.textSecondary,
-                          ),
-                        ),
-                        const Divider(color: AppConstants.dividerColor),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Total Amount:',
-                              style: AppConstants.bodyLarge,
-                            ),
-                            Text(
-                              Formatters.formatCurrency(order.totalAmount),
-                              style: AppConstants.headingMedium.copyWith(
-                                color: AppConstants.primaryOrange,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: AppConstants.paddingLarge),
-
-                  // Payment Method Selection
-                  const Text('Payment Method', style: AppConstants.bodyLarge),
-                  const SizedBox(height: AppConstants.paddingSmall),
-
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: paymentMethods.map((method) {
-                      final isSelected = selectedPaymentMethod == method;
-                      return ChoiceChip(
-                        label: Text(method),
-                        selected: isSelected,
-                        onSelected: (selected) {
-                          setDialogState(() {
-                            selectedPaymentMethod = method;
-                            if (method != 'Cash') {
-                              amountPaid = order.totalAmount;
-                              change = 0;
-                            }
-                          });
-                        },
-                        selectedColor: AppConstants.primaryOrange,
-                        backgroundColor: AppConstants.darkSecondary,
-                        labelStyle: TextStyle(
-                          color: isSelected
-                              ? Colors.white
-                              : AppConstants.textPrimary,
-                        ),
-                      );
-                    }).toList(),
-                  ),
-
-                  const SizedBox(height: AppConstants.paddingLarge),
-
-                  // Cash Payment Section
-                  if (selectedPaymentMethod == 'Cash') ...[
-                    const Text('Amount Paid', style: AppConstants.bodyLarge),
-                    const SizedBox(height: AppConstants.paddingSmall),
-
-                    // ADD THIS: TextEditingController
-                    Builder(
-                      builder: (context) {
-                        final amountController = TextEditingController(
-                          text: amountPaid > 0
-                              ? amountPaid.toStringAsFixed(2)
-                              : '',
-                        );
-
-                        return TextField(
-                          controller: amountController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            hintText: 'Enter amount',
-                            prefixText: '₱ ',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(
-                                AppConstants.radiusSmall,
-                              ),
-                            ),
-                            filled: true,
-                            fillColor: AppConstants.darkSecondary,
-                          ),
-                          onChanged: (value) {
-                            setDialogState(() {
-                              amountPaid = double.tryParse(value) ?? 0;
-                              change = amountPaid - order.totalAmount;
-                            });
-                          },
-                        );
-                      },
-                    ),
-
-                    const SizedBox(height: AppConstants.paddingMedium),
-
-                    // Quick Amount Buttons
-                    const Text('Quick Amount', style: AppConstants.bodyMedium),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children:
-                          [
-                            50.0,
-                            100.0,
-                            200.0,
-                            500.0,
-                            1000.0,
-                            order.totalAmount,
-                          ].map((amount) {
-                            return OutlinedButton(
-                              onPressed: () {
-                                setDialogState(() {
-                                  amountPaid = amount;
-                                  change = amountPaid - order.totalAmount;
-                                });
-                              },
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppConstants.primaryOrange,
-                                side: const BorderSide(
-                                  color: AppConstants.primaryOrange,
-                                ),
-                              ),
-                              child: Text(Formatters.formatCurrency(amount)),
-                            );
-                          }).toList(),
-                    ),
-
-                    const SizedBox(height: AppConstants.paddingMedium),
-
-                    // Change Display
-                    Container(
-                      padding: const EdgeInsets.all(AppConstants.paddingMedium),
-                      decoration: BoxDecoration(
-                        color: change >= 0
-                            ? AppConstants.successGreen.withOpacity(0.1)
-                            : AppConstants.errorRed.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(
-                          AppConstants.radiusMedium,
-                        ),
-                        border: Border.all(
-                          color: change >= 0
-                              ? AppConstants.successGreen
-                              : AppConstants.errorRed,
-                          width: 2,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Change', style: AppConstants.bodyLarge),
-                          Text(
-                            Formatters.formatCurrency(change > 0 ? change : 0),
-                            style: AppConstants.headingMedium.copyWith(
-                              color: change >= 0
-                                  ? AppConstants.successGreen
-                                  : AppConstants.errorRed,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    if (change < 0)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.warning,
-                              color: AppConstants.errorRed,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Insufficient amount paid',
-                              style: AppConstants.bodySmall.copyWith(
-                                color: AppConstants.errorRed,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: AppConstants.bodyMedium.copyWith(
-                  color: AppConstants.textSecondary,
-                ),
-              ),
-            ),
-            ElevatedButton.icon(
-              onPressed: (selectedPaymentMethod == 'Cash' && change < 0)
-                  ? null
-                  : () {
-                      Navigator.pop(context);
-                      _processPayment(
-                        order,
-                        selectedPaymentMethod,
-                        selectedPaymentMethod == 'Cash'
-                            ? amountPaid
-                            : order.totalAmount,
-                        selectedPaymentMethod == 'Cash' ? change : 0,
-                      );
-                    },
-              icon: const Icon(Icons.check_circle),
-              label: const Text('Complete Payment'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppConstants.successGreen,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: AppConstants.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+      builder: (_) => _CheckoutDialog(order: order),
+    ).then((result) {
+      if (!mounted || result == null) {
+        return;
+      }
+      _processPayment(
+        order,
+        result.paymentMethod,
+        result.amountPaid,
+        result.change,
+      );
+    });
   }
 
   /// Process payment and save to Firebase
@@ -1530,6 +1362,324 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
       default:
         return Icons.payment;
     }
+  }
+}
+
+class _CheckoutResult {
+  final String paymentMethod;
+  final double amountPaid;
+  final double change;
+
+  const _CheckoutResult({
+    required this.paymentMethod,
+    required this.amountPaid,
+    required this.change,
+  });
+}
+
+class _CheckoutDialog extends StatefulWidget {
+  final Order order;
+
+  const _CheckoutDialog({required this.order});
+
+  @override
+  State<_CheckoutDialog> createState() => _CheckoutDialogState();
+}
+
+class _CheckoutDialogState extends State<_CheckoutDialog> {
+  late final TextEditingController _amountController;
+  final List<String> _paymentMethods = const [
+    'Cash',
+    'Credit Card',
+    'Debit Card',
+    'GCash',
+    'PayMaya',
+  ];
+
+  String _selectedPaymentMethod = 'Cash';
+  double _amountPaid = 0;
+  double _change = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _amountController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppConstants.cardBackground,
+      title: Row(
+        children: [
+          const Icon(Icons.payment, color: AppConstants.primaryOrange),
+          const SizedBox(width: 8),
+          const Text('Checkout', style: AppConstants.headingMedium),
+        ],
+      ),
+      content: SizedBox(
+        width: 500,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildOrderSummary(),
+              const SizedBox(height: AppConstants.paddingLarge),
+              _buildPaymentMethodChips(),
+              const SizedBox(height: AppConstants.paddingLarge),
+              if (_selectedPaymentMethod == 'Cash') _buildCashSection(),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            FocusScope.of(context).unfocus();
+            Navigator.of(context).pop();
+          },
+          child: Text(
+            'Cancel',
+            style: AppConstants.bodyMedium.copyWith(
+              color: AppConstants.textSecondary,
+            ),
+          ),
+        ),
+        ElevatedButton.icon(
+          onPressed: (_selectedPaymentMethod == 'Cash' && _change < 0)
+              ? null
+              : () {
+                  FocusScope.of(context).unfocus();
+                  Navigator.of(context).pop(
+                    _CheckoutResult(
+                      paymentMethod: _selectedPaymentMethod,
+                      amountPaid: _selectedPaymentMethod == 'Cash'
+                          ? _amountPaid
+                          : widget.order.totalAmount,
+                      change: _selectedPaymentMethod == 'Cash' ? _change : 0,
+                    ),
+                  );
+                },
+          icon: const Icon(Icons.check_circle),
+          label: const Text('Complete Payment'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppConstants.successGreen,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: AppConstants.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOrderSummary() {
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      decoration: BoxDecoration(
+        color: AppConstants.darkSecondary,
+        borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Order #${widget.order.id}',
+            style: AppConstants.bodyLarge.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            widget.order.tableNumber.trim().isEmpty
+                ? 'No table'
+                : 'Table ${widget.order.tableNumber}',
+            style: AppConstants.bodyMedium.copyWith(
+              color: AppConstants.textSecondary,
+            ),
+          ),
+          const Divider(color: AppConstants.dividerColor),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Total Amount:', style: AppConstants.bodyLarge),
+              Text(
+                Formatters.formatCurrency(widget.order.totalAmount),
+                style: AppConstants.headingMedium.copyWith(
+                  color: AppConstants.primaryOrange,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentMethodChips() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Payment Method', style: AppConstants.bodyLarge),
+        const SizedBox(height: AppConstants.paddingSmall),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _paymentMethods.map((method) {
+            final isSelected = _selectedPaymentMethod == method;
+            return ChoiceChip(
+              label: Text(method),
+              selected: isSelected,
+              onSelected: (_) => _handlePaymentMethodChange(method),
+              selectedColor: AppConstants.primaryOrange,
+              backgroundColor: AppConstants.darkSecondary,
+              labelStyle: TextStyle(
+                color: isSelected ? Colors.white : AppConstants.textPrimary,
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCashSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Amount Paid', style: AppConstants.bodyLarge),
+        const SizedBox(height: AppConstants.paddingSmall),
+        TextField(
+          controller: _amountController,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(
+            hintText: 'Enter amount',
+            prefixText: '₱ ',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppConstants.radiusSmall),
+            ),
+            filled: true,
+            fillColor: AppConstants.darkSecondary,
+          ),
+          onChanged: (value) {
+            final parsed = double.tryParse(value) ?? 0;
+            setState(() {
+              _amountPaid = parsed;
+              _change = _amountPaid - widget.order.totalAmount;
+            });
+          },
+        ),
+        const SizedBox(height: AppConstants.paddingMedium),
+        const Text('Quick Amount', style: AppConstants.bodyMedium),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children:
+              <double>[
+                50.0,
+                100.0,
+                200.0,
+                500.0,
+                1000.0,
+                widget.order.totalAmount,
+              ].map((amount) {
+                return OutlinedButton(
+                  onPressed: () => _applyQuickAmount(amount),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppConstants.primaryOrange,
+                    side: const BorderSide(color: AppConstants.primaryOrange),
+                  ),
+                  child: Text(Formatters.formatCurrency(amount)),
+                );
+              }).toList(),
+        ),
+        const SizedBox(height: AppConstants.paddingMedium),
+        _buildChangeSummary(),
+        if (_change < 0) _buildInsufficientBanner(),
+      ],
+    );
+  }
+
+  void _handlePaymentMethodChange(String method) {
+    setState(() {
+      _selectedPaymentMethod = method;
+      if (method != 'Cash') {
+        _applyQuickAmount(widget.order.totalAmount, updateTextField: false);
+        _amountController.text = widget.order.totalAmount.toStringAsFixed(2);
+        _amountController.selection = TextSelection.collapsed(
+          offset: _amountController.text.length,
+        );
+      }
+    });
+  }
+
+  void _applyQuickAmount(double amount, {bool updateTextField = true}) {
+    setState(() {
+      _amountPaid = amount;
+      _change = _amountPaid - widget.order.totalAmount;
+      if (updateTextField) {
+        final formatted = amount.toStringAsFixed(2);
+        _amountController.value = TextEditingValue(
+          text: formatted,
+          selection: TextSelection.collapsed(offset: formatted.length),
+        );
+      }
+    });
+  }
+
+  Widget _buildChangeSummary() {
+    final isPositive = _change >= 0;
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.paddingMedium),
+      decoration: BoxDecoration(
+        color: (isPositive ? AppConstants.successGreen : AppConstants.errorRed)
+            .withOpacity(0.1),
+        borderRadius: BorderRadius.circular(AppConstants.radiusMedium),
+        border: Border.all(
+          color: isPositive ? AppConstants.successGreen : AppConstants.errorRed,
+          width: 2,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text('Change', style: AppConstants.bodyLarge),
+          Text(
+            Formatters.formatCurrency(isPositive ? _change : 0),
+            style: AppConstants.headingMedium.copyWith(
+              color: isPositive
+                  ? AppConstants.successGreen
+                  : AppConstants.errorRed,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInsufficientBanner() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          const Icon(Icons.warning, color: AppConstants.errorRed, size: 16),
+          const SizedBox(width: 4),
+          Text(
+            'Insufficient amount paid',
+            style: AppConstants.bodySmall.copyWith(
+              color: AppConstants.errorRed,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

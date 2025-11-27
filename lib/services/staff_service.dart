@@ -37,8 +37,7 @@ class StaffService {
     try {
       final snapshot = await _staffMemberRef(staffId).get();
       if (snapshot.exists) {
-        return Staff.fromJson(
-            Map<String, dynamic>.from(snapshot.value as Map));
+        return Staff.fromJson(Map<String, dynamic>.from(snapshot.value as Map));
       }
       return null;
     } catch (e) {
@@ -69,11 +68,13 @@ class StaffService {
 
   /// Update staff performance score
   Future<void> updatePerformanceScore(
-      String staffId, double performanceScore) async {
+    String staffId,
+    double performanceScore,
+  ) async {
     try {
-      await _staffMemberRef(staffId).update({
-        'performanceScore': performanceScore,
-      });
+      await _staffMemberRef(
+        staffId,
+      ).update({'performanceScore': performanceScore});
     } catch (e) {
       print('Error updating performance score: $e');
       rethrow;
@@ -86,10 +87,11 @@ class StaffService {
       final snapshot = await _staffMemberRef(staffId).get();
       if (snapshot.exists) {
         final staff = Staff.fromJson(
-            Map<String, dynamic>.from(snapshot.value as Map));
-        await _staffMemberRef(staffId).update({
-          'totalOrdersServed': staff.totalOrdersServed + 1,
-        });
+          Map<String, dynamic>.from(snapshot.value as Map),
+        );
+        await _staffMemberRef(
+          staffId,
+        ).update({'totalOrdersServed': staff.totalOrdersServed + 1});
       }
     } catch (e) {
       print('Error incrementing order count: $e');
@@ -110,9 +112,9 @@ class StaffService {
   /// Get staff by role
   Future<List<Staff>> getStaffByRole(StaffRole role) async {
     try {
-        final snapshot = await _staffRef
+      final snapshot = await _staffRef
           .orderByChild('role')
-          .equalTo(role.toString().split('.').last)
+          .equalTo(role.name)
           .get();
 
       final staffList = <Staff>[];
