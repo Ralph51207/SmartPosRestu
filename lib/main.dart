@@ -18,6 +18,7 @@ import 'services/expense_service.dart';
 import 'services/staff_service.dart';
 import 'services/transaction_service.dart';
 import 'utils/constants.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// Main entry point of the SmartServe POS application
 void main() async {
@@ -60,6 +61,8 @@ class SmartServePOS extends StatelessWidget {
         theme: ThemeData(
           // Dark theme configuration
           brightness: Brightness.dark,
+          // Use app-wide font family from constants (ensure font is added to pubspec)
+          fontFamily: AppConstants.fontFamily,
           scaffoldBackgroundColor: AppConstants.darkBackground,
           primaryColor: AppConstants.primaryOrange,
           colorScheme: ColorScheme.dark(
@@ -98,7 +101,8 @@ class SmartServePOS extends StatelessWidget {
             backgroundColor: AppConstants.primaryOrange,
             foregroundColor: Colors.white,
           ),
-          textTheme: const TextTheme(
+            textTheme: GoogleFonts.fredokaTextTheme(ThemeData.dark().textTheme)
+              .copyWith(
             headlineLarge: AppConstants.headingLarge,
             headlineMedium: AppConstants.headingMedium,
             headlineSmall: AppConstants.headingSmall,

@@ -14,10 +14,10 @@ class AppConstants {
   static const Color cardBackground = Color(0xFF252525);
   
   /// Primary accent color (orange/warm)
-  static const Color primaryOrange = Color(0xFFFF6B35);
+  static const Color primaryOrange = Color(0xFFFF7A00);
   
   /// Secondary accent color (light orange)
-  static const Color accentOrange = Color(0xFFFF8C42);
+  static const Color accentOrange = Color(0xFFFFA040);
   
   /// Success color (green)
   static const Color successGreen = Color(0xFF4CAF50);
@@ -35,7 +35,20 @@ class AppConstants {
   static const Color textSecondary = Color(0xFFB0B0B0);
   
   /// Divider color
-  static const Color dividerColor = Color(0xFF404040);
+  static const Color dividerColor = Color(0xFF3A3A3A);
+
+  // Logo / Brand assets
+  /// Path to the primary logo asset (optional)
+  static const String logoAssetPath = 'assets/images/LOGO.png';
+
+  /// Gradient to match the logo warm orange shading
+  static const Color logoGradientStart = Color(0xFFFF7A00);
+  static const Color logoGradientEnd = Color(0xFFFFA040);
+
+  // ========== TYPOGRAPHY ==========
+  /// Primary app font family. Install and include this font in `pubspec.yaml`
+  /// or change to a system font if preferred.
+  static const String fontFamily = 'Fredoka';
 
   // ========== SIZING ==========
   
@@ -92,6 +105,8 @@ class AppConstants {
 
   // ========== APP INFO ==========
   
-  static const String appName = 'SmartServe POS';
+  static const String appName = 'NOMI';
   static const String appVersion = '1.0.0';
+  /// Longer formal name
+  static const String appFormalName = 'NOM Intelligence';
 }
