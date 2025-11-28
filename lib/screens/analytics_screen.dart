@@ -553,9 +553,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           ),
           const SizedBox(height: AppConstants.paddingLarge),
 
-          // Forecast Accuracy Metrics
-          _buildForecastAccuracyCard(),
-          const SizedBox(height: AppConstants.paddingLarge),
+          
 
           // Forecast Summary Cards
           const Text('Forecast Summary', style: AppConstants.headingSmall),
@@ -563,14 +561,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           _buildForecastSummaryCards(),
           const SizedBox(height: AppConstants.paddingLarge),
 
-          // Forecast Trend Chart (Projected vs Actual)
-          const Text(
-            'Projected vs Actual Sales',
-            style: AppConstants.headingSmall,
-          ),
-          const SizedBox(height: AppConstants.paddingMedium),
-          _buildProjectedVsActualChart(),
-          const SizedBox(height: AppConstants.paddingLarge),
+          // Forecast Trend Chart removed from AI Forecast tab (moved to Comparison)
 
           // Weather and Holidays Calendar
           const Text(
@@ -629,7 +620,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   /// Insights tab with AI recommendations
   /// Metrics cards
   Widget _buildMetricsCards() {
-    final totalRevenueText = Formatters.formatCurrency(_totalRevenue);
+    final totalRevenueText = Formatters.formatCurrencyNoCents(_totalRevenue);
     final totalOrdersText = _countFormatter.format(_totalOrders);
     final averageOrderValueText = Formatters.formatCurrency(_averageOrderValue);
     final peakRevenueText = Formatters.formatCurrency(_peakHourRevenue);
@@ -2446,7 +2437,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     final recentPercent = (_forecastRecentAccuracy * 100).clamp(0, 100);
     final recentBar = _forecastRecentAccuracy.clamp(0.0, 1.0).toDouble();
     final salesPercent = (_forecastOverallAccuracy * 100).clamp(0, 100);
-    final trafficPercent = (_forecastTrafficAccuracy * 100).clamp(0, 100);
     final peakPercent = (_forecastPeakAccuracy * 100).clamp(0, 100);
 
     return Container(
@@ -2566,11 +2556,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                 'Sales',
                 '${salesPercent.toStringAsFixed(0)}%',
                 AppConstants.primaryOrange,
-              ),
-              _buildAccuracyMetric(
-                'Traffic',
-                '${trafficPercent.toStringAsFixed(0)}%',
-                Colors.blue,
               ),
               _buildAccuracyMetric(
                 'Peak Hours',
@@ -3623,6 +3608,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           _buildMetricsComparison(),
           const SizedBox(height: AppConstants.paddingLarge),
 
+          // Forecast Accuracy Metrics (moved from Forecast tab)
+          _buildForecastAccuracyCard(),
+          const SizedBox(height: AppConstants.paddingLarge),
+
           // Sales Trend Comparison Chart
           const Text(
             'Sales Trend: Historical vs Forecast',
@@ -4610,29 +4599,32 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       : rawShare / totalHistoricalShare;
                   return Expanded(
                     flex: shareFlex(share),
-                    child: Container(
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.5),
-                        borderRadius: BorderRadius.only(
-                          topLeft:
-                              isFirst ? const Radius.circular(6) : Radius.zero,
-                          bottomLeft:
-                              isFirst ? const Radius.circular(6) : Radius.zero,
-                          topRight:
-                              isLast ? const Radius.circular(6) : Radius.zero,
-                          bottomRight:
-                              isLast ? const Radius.circular(6) : Radius.zero,
-                        ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.only(
+                        topLeft: isFirst ? const Radius.circular(6) : Radius.zero,
+                        bottomLeft: isFirst ? const Radius.circular(6) : Radius.zero,
+                        topRight: isLast ? const Radius.circular(6) : Radius.zero,
+                        bottomRight: isLast ? const Radius.circular(6) : Radius.zero,
                       ),
-                      child: Center(
-                        child: Text(
-                          shareLabel(rawShare.clamp(0, 1).toDouble()),
-                          style: AppConstants.bodySmall.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 10,
-                          ),
+                      child: Container(
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.5),
+                        ),
+                        child: Center(
+                          child: share >= 0.05
+                              ? FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    shareLabel(share.clamp(0.0, 1.0).toDouble()),
+                                    style: AppConstants.bodySmall.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
                         ),
                       ),
                     ),
@@ -4671,29 +4663,32 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                       : rawShare / totalForecastShare;
                   return Expanded(
                     flex: shareFlex(share),
-                    child: Container(
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: color,
-                        borderRadius: BorderRadius.only(
-                          topLeft:
-                              isFirst ? const Radius.circular(6) : Radius.zero,
-                          bottomLeft:
-                              isFirst ? const Radius.circular(6) : Radius.zero,
-                          topRight:
-                              isLast ? const Radius.circular(6) : Radius.zero,
-                          bottomRight:
-                              isLast ? const Radius.circular(6) : Radius.zero,
-                        ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.only(
+                        topLeft: isFirst ? const Radius.circular(6) : Radius.zero,
+                        bottomLeft: isFirst ? const Radius.circular(6) : Radius.zero,
+                        topRight: isLast ? const Radius.circular(6) : Radius.zero,
+                        bottomRight: isLast ? const Radius.circular(6) : Radius.zero,
                       ),
-                      child: Center(
-                        child: Text(
-                          shareLabel(rawShare.clamp(0, 1).toDouble()),
-                          style: AppConstants.bodySmall.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 10,
-                          ),
+                      child: Container(
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: color,
+                        ),
+                        child: Center(
+                          child: share >= 0.05
+                              ? FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    shareLabel(share.clamp(0.0, 1.0).toDouble()),
+                                    style: AppConstants.bodySmall.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
                         ),
                       ),
                     ),
@@ -4705,7 +4700,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           const SizedBox(height: AppConstants.paddingLarge),
 
           // Channel details
-          ...rows.asMap().entries.map((entry) {
+            ...rows.asMap().entries.map((entry) {
             final index = entry.key;
             final row = entry.value;
             final color = palette[index % palette.length];
@@ -4720,6 +4715,25 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             final forecastProgress = maxChannelOrders <= 0
                 ? 0.0
                 : row.forecastOrders / maxChannelOrders;
+
+            // Compute normalized shares (matching the top distribution bars)
+            final rawHistShare = row.historicalShare > 0
+              ? row.historicalShare
+              : (totalHistoricalOrders <= 0
+                ? 0.0
+                : row.historicalOrders / totalHistoricalOrders);
+            final normHistShare = totalHistoricalShare <= 0
+              ? rawHistShare
+              : rawHistShare / totalHistoricalShare;
+
+            final rawFcastShare = row.forecastShare > 0
+              ? row.forecastShare
+              : (totalForecastOrders <= 0
+                ? 0.0
+                : row.forecastOrders / totalForecastOrders);
+            final normFcastShare = totalForecastShare <= 0
+              ? rawFcastShare
+              : rawFcastShare / totalForecastShare;
 
             return Container(
               margin: const EdgeInsets.only(bottom: AppConstants.paddingSmall),
@@ -4749,6 +4763,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                           style: AppConstants.bodyMedium.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: false,
                         ),
                       ),
                       Column(
@@ -4802,7 +4819,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Historical share: ${shareLabel(row.historicalShare)}',
+                              'Historical share: ${shareLabel(normHistShare.clamp(0.0, 1.0).toDouble())}',
                               style: AppConstants.bodySmall.copyWith(
                                 color: AppConstants.textSecondary,
                               ),
@@ -4830,7 +4847,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Forecast share: ${shareLabel(row.forecastShare)}',
+                              'Forecast share: ${shareLabel(normFcastShare.clamp(0.0, 1.0).toDouble())}',
                               style: AppConstants.bodySmall.copyWith(
                                 color: AppConstants.primaryOrange,
                               ),
